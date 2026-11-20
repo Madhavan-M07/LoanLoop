@@ -1,0 +1,15 @@
+# Consistent line endings on every OS. Repo and working copies use LF, so shell scripts and
+# git hooks work on Linux servers and CI even when edited on Windows.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Binary files: never touch
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.pdf  binary
+*.ico  binary
