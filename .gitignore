@@ -1,0 +1,50 @@
+# Secrets & local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Real data must never be committed
+evals/data/real/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+.next/
+out/
+coverage/
+
+# Eval run outputs
+evals/results/
+
+# Local runtime data (uploads, DB/Temporal/Langfuse volumes, logs)
+uploads/
+storage/
+infra/data/
+*.log
+logs/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+*.tsbuildinfo
+next-env.d.ts
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
