@@ -88,7 +88,7 @@ async def process_document(
         "classified",
         loan.id,
         f"{doc.id}: {cls.value.doc_type if cls.value else 'FAILED'} "
-        f"attempts={cls.attempts} prompt={cls.prompt_version}",
+        f"attempts={cls.attempts} prompt={cls.prompt_version} model={cls.model or 'none'}",
     )
     if not cls.ok or cls.value is None:
         return await _needs_review(
@@ -107,7 +107,8 @@ async def process_document(
         "extractor_agent",
         "extracted" if ext.ok else "extraction_failed",
         loan.id,
-        f"{doc.id}: attempts={ext.attempts} errors={len(ext.errors)}",
+        f"{doc.id}: attempts={ext.attempts} errors={len(ext.errors)} "
+        f"prompt={ext.prompt_version} model={ext.model or 'none'}",
     )
     if not ext.ok or ext.value is None:
         return await _needs_review(store, llm, loan, doc, f"extraction failed: {ext.errors[-1:]}")

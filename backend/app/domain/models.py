@@ -115,7 +115,7 @@ class Document(BaseModel):
     status: DocStatus
     doc_type: DocType = DocType.UNKNOWN
     classification: Classification | None = None
-    fields: PaystubFields | W2Fields | BankStatementFields | None = None
+    fields: ExtractedFields | None = None
     review_reasons: list[str] = []
     uploaded_by: str
     uploaded_at: datetime

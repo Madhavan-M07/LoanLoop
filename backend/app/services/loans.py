@@ -8,7 +8,6 @@ from pydantic import BaseModel
 
 from app.data.store import Store
 from app.domain.models import (
-    DocStatus,
     DraftStatus,
     Loan,
     LoanStage,
@@ -157,11 +156,3 @@ def reject_draft(store: Store, p: Principal, draft_id: str) -> MessageDraft:
     d.status, d.decided_by, d.decided_at = DraftStatus.REJECTED, p.subject, store.now()
     store.audit(p.subject, "draft_rejected", d.loan_id, d.id)
     return d
-
-
-def docs_needing_review(store: Store, p: Principal) -> int:
-    return sum(
-        d.status == DocStatus.NEEDS_REVIEW
-        for ln in loans_for(store, p)
-        for d in store.documents[ln.id]
-    )

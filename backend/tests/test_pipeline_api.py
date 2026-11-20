@@ -164,3 +164,11 @@ def test_agent_uploads_do_not_return_extracted_fields(client):
 def test_stuck_files(client):
     stuck = client.get("/loans/stuck", headers=H["proc"]).json()
     assert [s["loan_id"] for s in stuck] == ["L-1002"]  # 4 days idle; L-1001 is fresh
+
+
+def test_audit_records_which_model_and_prompt_produced_each_result(client, store):
+    full_file(client)
+    ai_events = [e for e in store.audit_log if e.actor in ("classifier_agent", "extractor_agent")]
+    assert ai_events and all(
+        "model=offline" in e.detail and "prompt=v1" in e.detail for e in ai_events
+    )

@@ -10,14 +10,13 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable
 from typing import Any
 
 from app.llm.client import ChatResult, LLMError, ToolCall
 
 
 class ScriptedLLM:
-    def __init__(self, responses: list[ChatResult | Exception | Callable[..., ChatResult]]) -> None:
+    def __init__(self, responses: list[ChatResult | Exception]) -> None:
         self.responses = list(responses)
         self.calls: list[dict[str, Any]] = []
 
@@ -34,7 +33,7 @@ class ScriptedLLM:
         r = self.responses.pop(0)
         if isinstance(r, Exception):
             raise r
-        return r(messages, tools) if callable(r) else r
+        return r
 
 
 def text(content: str) -> ChatResult:

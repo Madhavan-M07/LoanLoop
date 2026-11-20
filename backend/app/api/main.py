@@ -92,7 +92,6 @@ def create_app(
     )
 
     app = FastAPI(title="LoanLoop API", version="0.1.0")
-    app.state.ll = state
 
     @app.exception_handler(NotFound)
     async def _nf(_: Request, e: NotFound) -> JSONResponse:
