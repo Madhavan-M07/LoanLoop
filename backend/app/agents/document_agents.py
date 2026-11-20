@@ -10,8 +10,6 @@ from app.agents.structured import StepOutcome, document_block, run_structured
 from app.domain.models import SCHEMA_FOR, Classification, DocType
 from app.llm.client import LLM
 
-MIN_CLASSIFY_CONFIDENCE = 0.6
-
 
 async def classify(llm: LLM, masked_text: str) -> StepOutcome[Classification]:
     return await run_structured(

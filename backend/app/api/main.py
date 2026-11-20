@@ -19,8 +19,8 @@ from app.llm.factory import build_llm
 from app.services import loans
 from app.services.access import Forbidden, NotFound, get_loan_for, require_processor
 from app.services.notifier import Notifier, OutboxNotifier, TelegramNotifier
-from app.services.pipeline import process_document
-from app.services.store import Store, seed_demo
+from app.services.pipeline import PipelineConfig, process_document
+from app.services.store import Store, load_loans
 
 
 @dataclass
@@ -62,14 +62,22 @@ def create_app(
     notifier: Notifier | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
-    store = store or seed_demo(Store())
+    if store is None:
+        store = Store()
+        demo = settings.demo_data()  # None unless LOANLOOP_DEMO_DATA_PATH is set (dev/test only)
+        if demo:
+            load_loans(store, demo.get("loans", []))
+    pipeline_cfg = PipelineConfig(
+        min_classify_confidence=settings.classify_min_confidence,
+        max_document_chars=settings.max_document_chars,
+    )
     state = AppState(
         settings=settings,
         store=store,
         llm=llm or build_llm(settings),
         notifier=notifier
         or (
-            TelegramNotifier(store, settings.telegram_bot_token)
+            TelegramNotifier(store, settings.telegram_bot_token, settings.notifier_timeout_s)
             if settings.telegram_bot_token
             else OutboxNotifier(store)
         ),
@@ -110,8 +118,8 @@ def create_app(
         return loans.list_loans(store, p)
 
     @app.get("/loans/stuck")
-    async def stuck(p: P, min_days: int = 2) -> list[loans.LoanSummary]:
-        return loans.stuck_files(store, p, min_days)
+    async def stuck(p: P, min_days: int | None = None) -> list[loans.LoanSummary]:
+        return loans.stuck_files(store, p, min_days or settings.stuck_after_days)
 
     @app.get("/loans/{loan_id}/status")
     async def status(p: P, loan_id: str) -> LoanStatus:
@@ -125,7 +133,13 @@ def create_app(
     async def upload(p: P, loan_id: str, body: UploadIn) -> Document:
         loan = get_loan_for(store, p, loan_id)
         doc = await process_document(
-            store, state.llm, loan, filename=body.filename, text=body.text, uploaded_by=p.subject
+            store,
+            state.llm,
+            loan,
+            filename=body.filename,
+            text=body.text,
+            uploaded_by=p.subject,
+            cfg=pipeline_cfg,
         )
         assert doc is not None
         return doc.model_copy(update={"fields": None}) if p.via_agent else doc
@@ -149,7 +163,14 @@ def create_app(
     @app.post("/assistant/ask")
     async def ask(p: P, body: AskIn) -> AskOut:
         require_processor(p)
-        run = await assistant.ask(store, state.llm, p, body.question)
+        run = await assistant.ask(
+            store,
+            state.llm,
+            p,
+            body.question,
+            max_steps=settings.agent_max_steps,
+            stuck_after_days=settings.stuck_after_days,
+        )
         return AskOut(answer=run.answer, steps=run.steps, stopped=run.stopped)
 
     @app.get("/audit")

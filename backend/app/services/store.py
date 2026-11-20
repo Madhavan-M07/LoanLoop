@@ -1,6 +1,6 @@
 """In-memory store (Phase 1 slice). Same interface will be backed by PostgreSQL + RLS next.
 
-Synthetic seed data only.
+Contains no data of its own: loans come from the API (later) or a demo file (dev/test).
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ import itertools
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 from app.core.pii import mask_for_log
 from app.domain.models import (
@@ -58,24 +59,22 @@ class Store:
         self.results.setdefault(loan.id, [])
 
 
-def seed_demo(store: Store) -> Store:
+def load_loans(store: Store, loans: list[dict[str, Any]]) -> Store:
+    """Load loans from data (demo file today, admin API / Postgres next). `days_idle` lets demo
+    data express recency relative to now."""
     now = store.now()
-    all_docs = [DocType.PAYSTUB, DocType.W2, DocType.BANK_STATEMENT]
-    for loan_id, org, name, subject, debts, days_idle in [
-        ("L-1001", "acme", "Priya Sharma", "bor-priya", "1450.00", 0),
-        ("L-1002", "acme", "John Carter", "bor-john", "900.00", 4),
-        ("L-2001", "beta", "Meera Iyer", "bor-meera", "2100.00", 1),
-    ]:
+    for raw in loans:
+        days_idle = int(raw.get("days_idle", 0))
         store.add_loan(
             Loan(
-                id=loan_id,
-                org_id=org,
-                borrower_name=name,
-                borrower_subject=subject,
-                loan_officer="lo-sam" if org == "acme" else "lo-kim",
-                monthly_debts=Decimal(debts),
-                required_docs=all_docs,
-                created_at=now - timedelta(days=days_idle + 3),
+                **{
+                    k: v
+                    for k, v in raw.items()
+                    if k not in {"days_idle", "monthly_debts", "required_docs"}
+                },
+                monthly_debts=Decimal(str(raw["monthly_debts"])),
+                required_docs=[DocType(d) for d in raw["required_docs"]],
+                created_at=now - timedelta(days=days_idle),
                 last_activity_at=now - timedelta(days=days_idle),
             )
         )

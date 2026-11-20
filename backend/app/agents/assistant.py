@@ -27,14 +27,16 @@ class NoArgs(BaseModel):
 
 
 class LoanIdArg(BaseModel):
-    loan_id: str = Field(pattern=r"^L-\d{4}$", description="Loan id like L-1001")
+    loan_id: str = Field(min_length=1, max_length=64, description="The loan file id")
 
 
 class StuckArgs(BaseModel):
-    min_days: int = Field(default=2, ge=1, le=60)
+    min_days: int | None = Field(
+        default=None, ge=1, le=365, description="Idle days; omit to use the team default"
+    )
 
 
-def build_tools(store: Store) -> list[ToolSpec]:
+def build_tools(store: Store, *, stuck_after_days: int) -> list[ToolSpec]:
     def guard(fn):  # map domain errors to user-safe tool errors
         async def wrapped(args: BaseModel, p: Principal):
             try:
@@ -63,7 +65,7 @@ def build_tools(store: Store) -> list[ToolSpec]:
             "list_stuck_files",
             "Loan files with no activity for at least min_days days.",
             StuckArgs,
-            guard(lambda a, p: loans.stuck_files(store, p, a.min_days)),
+            guard(lambda a, p: loans.stuck_files(store, p, a.min_days or stuck_after_days)),
             PROC,
         ),
         ToolSpec(
@@ -76,12 +78,21 @@ def build_tools(store: Store) -> list[ToolSpec]:
     ]
 
 
-async def ask(store: Store, llm: LLM, principal: Principal, question: str) -> AgentRun:
+async def ask(
+    store: Store,
+    llm: LLM,
+    principal: Principal,
+    question: str,
+    *,
+    max_steps: int,
+    stuck_after_days: int,
+) -> AgentRun:
     return await run_tool_agent(
         llm,
         system=SYSTEM,
         user_message=question,
-        tools=build_tools(store),
+        tools=build_tools(store, stuck_after_days=stuck_after_days),
         principal=principal,
         audit=lambda action, p, status: store.audit(p.subject, action, detail=status),
+        max_steps=max_steps,
     )

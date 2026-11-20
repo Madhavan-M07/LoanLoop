@@ -28,9 +28,10 @@ class OutboxNotifier:
 class TelegramNotifier:
     """Sends via the Telegram Bot API to the borrower's linked chat (falls back to outbox)."""
 
-    def __init__(self, store: Store, bot_token: str) -> None:
+    def __init__(self, store: Store, bot_token: str, timeout_s: float) -> None:
         self.store = store
         self.bot_token = bot_token
+        self.timeout_s = timeout_s
         self.fallback = OutboxNotifier(store)
 
     async def send(self, loan: Loan, body: str) -> bool:
@@ -38,7 +39,7 @@ class TelegramNotifier:
             return await self.fallback.send(loan, body)
         url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
         try:
-            async with httpx.AsyncClient(timeout=10) as http:
+            async with httpx.AsyncClient(timeout=self.timeout_s) as http:
                 r = await http.post(url, json={"chat_id": loan.telegram_chat_id, "text": body})
             return r.status_code == 200
         except httpx.HTTPError:

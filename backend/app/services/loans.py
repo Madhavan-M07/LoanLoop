@@ -93,7 +93,7 @@ def loan_file(store: Store, p: Principal, loan_id: str) -> LoanFile:
     )
 
 
-def stuck_files(store: Store, p: Principal, min_days: int = 2) -> list[LoanSummary]:
+def stuck_files(store: Store, p: Principal, min_days: int) -> list[LoanSummary]:
     require_processor(p)
     cutoff = store.now() - timedelta(days=min_days)
     return [

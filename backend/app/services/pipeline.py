@@ -10,10 +10,10 @@ the step functions stay the same.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date
 
 from app.agents.document_agents import (
-    MIN_CLASSIFY_CONFIDENCE,
     classify,
     draft_borrower_message,
     extract,
@@ -35,11 +35,24 @@ from app.llm.client import LLM
 from app.rules.engine import borrower_actions, evaluate_loan
 from app.services.store import Store
 
-MAX_CHARS = 50_000
+
+@dataclass(frozen=True)
+class PipelineConfig:
+    """Operational knobs, supplied from Settings (never module constants)."""
+
+    min_classify_confidence: float
+    max_document_chars: int
 
 
 async def process_document(
-    store: Store, llm: LLM, loan: Loan, *, filename: str, text: str, uploaded_by: str
+    store: Store,
+    llm: LLM,
+    loan: Loan,
+    *,
+    filename: str,
+    text: str,
+    uploaded_by: str,
+    cfg: PipelineConfig,
 ) -> Document:
     doc = Document(
         id=store.new_id("D"),
@@ -53,7 +66,7 @@ async def process_document(
     store.audit(uploaded_by, "document_uploaded", loan.id, f"{doc.id} {doc.filename}")
 
     # 1. Security gate (deterministic)
-    if not text.strip() or len(text) > MAX_CHARS:
+    if not text.strip() or len(text) > cfg.max_document_chars:
         doc.status = DocStatus.REJECTED
         doc.review_reasons.append("empty or too large")
         store.audit("system", "document_rejected", loan.id, doc.id)
@@ -83,7 +96,7 @@ async def process_document(
         )
     doc.classification = cls.value
     doc.doc_type = cls.value.doc_type
-    if cls.value.doc_type == DocType.UNKNOWN or cls.value.confidence < MIN_CLASSIFY_CONFIDENCE:
+    if cls.value.doc_type == DocType.UNKNOWN or cls.value.confidence < cfg.min_classify_confidence:
         return await _needs_review(
             store, llm, loan, doc, f"low-confidence classification ({cls.value.confidence})"
         )
