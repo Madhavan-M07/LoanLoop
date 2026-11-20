@@ -47,3 +47,10 @@ def require_human_processor(p: Principal) -> None:
     require_processor(p)
     if p.via_agent:
         raise Forbidden(f"agents ({p.via_agent}) cannot perform this action; a human must")
+
+
+def require_admin(p: Principal) -> None:
+    """Organization settings: human processors with the admin flag only."""
+    require_human_processor(p)
+    if not p.is_admin:
+        raise Forbidden("organization admin required")

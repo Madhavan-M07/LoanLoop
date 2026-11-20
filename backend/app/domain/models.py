@@ -7,7 +7,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Scope(StrEnum):
@@ -23,6 +23,25 @@ class Principal(BaseModel):
     org_id: str
     loan_id: str | None = None  # set for borrowers: the only loan they may touch
     via_agent: str | None = None  # e.g. "openclaw", "hermes" when acting through MCP
+    is_admin: bool = False  # may change organization settings (humans only)
+
+
+class LenderPolicy(BaseModel):
+    """An organization's document rules. Required on every organization; there is no default
+    in code. Bounds reject values that are clearly a mistake."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    paystub_max_age_days: int = Field(ge=1, le=365)
+    bank_statement_max_age_days: int = Field(ge=1, le=365)
+    w2_max_years_back: int = Field(ge=0, le=5, description="Oldest acceptable W-2: year - N")
+    max_dti: Decimal = Field(gt=0, le=1, decimal_places=3)
+
+
+class Organization(BaseModel):
+    id: str
+    name: str
+    policy: LenderPolicy
 
 
 class DocType(StrEnum):
@@ -170,4 +189,5 @@ class AuditEvent(BaseModel):
     actor: str
     action: str
     loan_id: str | None = None
+    org_id: str | None = None  # organization-level events (e.g. policy changes)
     detail: str = ""

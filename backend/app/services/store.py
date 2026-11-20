@@ -18,6 +18,7 @@ from app.domain.models import (
     Document,
     Loan,
     MessageDraft,
+    Organization,
     RuleResult,
 )
 
@@ -31,6 +32,7 @@ def utc_now() -> datetime:
 class Store:
     def __init__(self, clock: Clock = utc_now) -> None:
         self.now = clock
+        self.orgs: dict[str, Organization] = {}
         self.loans: dict[str, Loan] = {}
         self.documents: dict[str, list[Document]] = {}
         self.results: dict[str, list[RuleResult]] = {}
@@ -42,21 +44,47 @@ class Store:
     def new_id(self, prefix: str) -> str:
         return f"{prefix}-{next(self._ids):05d}"
 
-    def audit(self, actor: str, action: str, loan_id: str | None = None, detail: str = "") -> None:
+    def audit(
+        self,
+        actor: str,
+        action: str,
+        loan_id: str | None = None,
+        detail: str = "",
+        *,
+        org_id: str | None = None,
+    ) -> None:
+        if org_id is None and loan_id in self.loans:
+            org_id = self.loans[loan_id].org_id
         self.audit_log.append(
             AuditEvent(
                 at=self.now(),
                 actor=actor,
                 action=action,
                 loan_id=loan_id,
+                org_id=org_id,
                 detail=mask_for_log(detail)[:500],
             )
         )
 
+    def org(self, org_id: str) -> Organization:
+        """Every loan belongs to a known organization; a missing one is a data error."""
+        try:
+            return self.orgs[org_id]
+        except KeyError:
+            raise LookupError(f"organization {org_id} is not configured") from None
+
     def add_loan(self, loan: Loan) -> None:
+        self.org(loan.org_id)  # refuse loans for unknown organizations
         self.loans[loan.id] = loan
         self.documents.setdefault(loan.id, [])
         self.results.setdefault(loan.id, [])
+
+
+def load_orgs(store: Store, orgs: list[dict[str, Any]]) -> Store:
+    for raw in orgs:
+        org = Organization.model_validate(raw)  # policy is required and validated
+        store.orgs[org.id] = org
+    return store
 
 
 def load_loans(store: Store, loans: list[dict[str, Any]]) -> Store:

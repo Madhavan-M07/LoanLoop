@@ -11,7 +11,6 @@ the step functions stay the same.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
 
 from app.agents.document_agents import (
     classify,
@@ -70,7 +69,8 @@ async def process_document(
         doc.status = DocStatus.REJECTED
         doc.review_reasons.append("empty or too large")
         store.audit("system", "document_rejected", loan.id, doc.id)
-        return await reevaluate(store, llm, loan, doc)
+        await reevaluate(store, llm, loan, touch_activity=True)
+        return doc
     hits = detect_injection(text)
     if hits:
         doc.review_reasons.append(f"possible prompt injection: {', '.join(hits)[:200]}")
@@ -116,22 +116,27 @@ async def process_document(
     schema = SCHEMA_FOR[cls.value.doc_type]
     doc.fields = schema.model_validate(vault.rehydrate(ext.value.model_dump(mode="json")))  # type: ignore[assignment]
     doc.status = DocStatus.NEEDS_REVIEW if hits else DocStatus.EXTRACTED
-    return await reevaluate(store, llm, loan, doc)
+    await reevaluate(store, llm, loan, touch_activity=True)
+    return doc
 
 
 async def _needs_review(store: Store, llm: LLM, loan: Loan, doc: Document, reason: str) -> Document:
     doc.status = DocStatus.NEEDS_REVIEW
     doc.review_reasons.append(reason)
-    return await reevaluate(store, llm, loan, doc)
+    await reevaluate(store, llm, loan, touch_activity=True)
+    return doc
 
 
-async def reevaluate(
-    store: Store, llm: LLM, loan: Loan, doc: Document | None = None, today: date | None = None
-) -> Document | None:  # type: ignore[return]
-    """Run the rules engine over the whole file, update stage, draft a message if needed."""
-    today = today or store.now().date()
+async def reevaluate(store: Store, llm: LLM, loan: Loan, *, touch_activity: bool) -> None:
+    """Re-run the rules over the whole file with the organization's CURRENT policy, update the
+    stage, and draft a borrower message if something is outstanding.
+
+    touch_activity: True only for real file activity (an upload). A policy change re-checks
+    files but must not make them look recently active (that would hide stuck files).
+    """
     docs = store.documents[loan.id]
-    results = evaluate_loan(loan, docs, today)
+    policy = store.org(loan.org_id).policy
+    results = evaluate_loan(loan, docs, store.now().date(), policy)
     store.results[loan.id] = results
     actions = borrower_actions(results)
 
@@ -143,7 +148,8 @@ async def reevaluate(
         loan.stage = LoanStage.NEEDS_REVIEW
     else:
         loan.stage = LoanStage.COMPLETE
-    loan.last_activity_at = store.now()
+    if touch_activity:
+        loan.last_activity_at = store.now()
     store.audit(
         "rules_engine",
         "evaluated",
@@ -155,7 +161,6 @@ async def reevaluate(
         await _draft_if_changed(store, llm, loan, actions)
     elif not actions:
         _retire_stale_drafts(store, loan, keep_key=None)  # nothing outstanding any more
-    return doc
 
 
 def _retire_stale_drafts(store: Store, loan: Loan, keep_key: str | None) -> bool:

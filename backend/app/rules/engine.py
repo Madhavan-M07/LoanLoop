@@ -1,13 +1,12 @@
 """Deterministic rules engine. Pure functions: no I/O, no LLM, fully unit-tested.
 
-The LLM reads documents; THIS code decides whether they pass. Thresholds are lender policy
-(configurable), not model output.
+The LLM reads documents; THIS code decides whether they pass. Every threshold comes from the
+organization's LenderPolicy (data), passed in by the caller. Only facts live here.
 """
 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -16,6 +15,7 @@ from app.domain.models import (
     DocStatus,
     DocType,
     Document,
+    LenderPolicy,
     Loan,
     PaystubFields,
     RuleResult,
@@ -23,17 +23,8 @@ from app.domain.models import (
     W2Fields,
 )
 
+# Facts, not policy: pay periods in a year.
 PERIODS_PER_YEAR = {"weekly": 52, "biweekly": 26, "semimonthly": 24, "monthly": 12}
-
-
-@dataclass(frozen=True)
-class LenderPolicy:
-    paystub_max_age_days: int = 30
-    bank_statement_max_age_days: int = 60
-    max_dti: Decimal = Decimal("0.43")
-
-
-DEFAULT_POLICY = LenderPolicy()
 
 _SUFFIXES = re.compile(r"\b(inc|llc|ltd|corp|corporation|co|company)\b\.?", re.I)
 
@@ -109,7 +100,7 @@ def check_paystub(
 
 
 def evaluate_loan(
-    loan: Loan, docs: list[Document], as_of: date, pol: LenderPolicy = DEFAULT_POLICY
+    loan: Loan, docs: list[Document], as_of: date, pol: LenderPolicy
 ) -> list[RuleResult]:
     """All rule results for a loan file. Same inputs -> same outputs, always."""
     results: list[RuleResult] = []
@@ -150,13 +141,17 @@ def evaluate_loan(
                         borrower_action="Send your most recent bank statement.",
                     )
                 )
-        elif isinstance(d.fields, W2Fields) and d.fields.tax_year < as_of.year - 2:
+        elif (
+            isinstance(d.fields, W2Fields)
+            and d.fields.tax_year < as_of.year - pol.w2_max_years_back
+        ):
             results.append(
                 RuleResult(
                     code="w2_too_old",
                     severity=Severity.FAIL,
                     document_id=d.id,
-                    message=f"W-2 is for {d.fields.tax_year}.",
+                    message=f"W-2 is for {d.fields.tax_year} "
+                    f"(oldest accepted: {as_of.year - pol.w2_max_years_back}).",
                     borrower_action=f"Send your {as_of.year - 1} W-2.",
                 )
             )

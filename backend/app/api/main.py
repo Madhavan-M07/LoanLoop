@@ -13,14 +13,21 @@ from pydantic import BaseModel, Field
 
 from app.agents import assistant
 from app.core.config import Settings, get_settings
-from app.domain.models import AuditEvent, Document, LoanStatus, MessageDraft, Principal
+from app.domain.models import (
+    AuditEvent,
+    Document,
+    LenderPolicy,
+    LoanStatus,
+    MessageDraft,
+    Principal,
+)
 from app.llm.client import LLM
 from app.llm.factory import build_llm
-from app.services import loans
+from app.services import loans, policy
 from app.services.access import Forbidden, NotFound, get_loan_for, require_processor
 from app.services.notifier import Notifier, OutboxNotifier, TelegramNotifier
 from app.services.pipeline import PipelineConfig, process_document
-from app.services.store import Store, load_loans
+from app.services.store import Store, load_loans, load_orgs
 
 
 @dataclass
@@ -66,6 +73,7 @@ def create_app(
         store = Store()
         demo = settings.demo_data()  # None unless LOANLOOP_DEMO_DATA_PATH is set (dev/test only)
         if demo:
+            load_orgs(store, demo.get("organizations", []))
             load_loans(store, demo.get("loans", []))
     pipeline_cfg = PipelineConfig(
         min_classify_confidence=settings.classify_min_confidence,
@@ -179,8 +187,15 @@ def create_app(
         if loan_id:
             get_loan_for(store, p, loan_id)
             return [e for e in store.audit_log if e.loan_id == loan_id]
-        mine = {ln.id for ln in loans.loans_for(store, p)}
-        return [e for e in store.audit_log if e.loan_id in mine]
+        return [e for e in store.audit_log if e.org_id == p.org_id]
+
+    @app.get("/org/policy")
+    async def read_policy(p: P) -> LenderPolicy:
+        return policy.get_policy(store, p)
+
+    @app.put("/org/policy")
+    async def replace_policy(p: P, body: LenderPolicy) -> LenderPolicy:
+        return await policy.update_policy(store, state.llm, p, body)
 
     return app
 

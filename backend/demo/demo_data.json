@@ -1,19 +1,107 @@
 {
   "_comment": "SYNTHETIC demo data for local dev and tests only. Loaded via LOANLOOP_DEMO_DATA_PATH; refused in prod.",
+  "organizations": [
+    {
+      "id": "acme",
+      "name": "Acme Mortgage (demo)",
+      "policy": {
+        "paystub_max_age_days": 30,
+        "bank_statement_max_age_days": 60,
+        "w2_max_years_back": 2,
+        "max_dti": "0.43"
+      }
+    },
+    {
+      "id": "beta",
+      "name": "Beta Lending (demo)",
+      "policy": {
+        "paystub_max_age_days": 45,
+        "bank_statement_max_age_days": 90,
+        "w2_max_years_back": 2,
+        "max_dti": "0.50"
+      }
+    }
+  ],
   "principals": {
-    "dev-processor-acme": {"subject": "proc-anita", "scope": "processor", "org_id": "acme"},
-    "dev-processor-beta": {"subject": "proc-ravi", "scope": "processor", "org_id": "beta"},
-    "dev-borrower-priya": {"subject": "bor-priya", "scope": "borrower", "org_id": "acme", "loan_id": "L-1001"},
-    "dev-borrower-john": {"subject": "bor-john", "scope": "borrower", "org_id": "acme", "loan_id": "L-1002"},
-    "dev-hermes-acme": {"subject": "hermes@acme", "scope": "processor", "org_id": "acme", "via_agent": "hermes"},
-    "dev-openclaw-priya": {"subject": "openclaw:bor-priya", "scope": "borrower", "org_id": "acme", "loan_id": "L-1001", "via_agent": "openclaw"}
+    "dev-processor-acme": {
+      "subject": "proc-anita",
+      "scope": "processor",
+      "org_id": "acme",
+      "is_admin": true
+    },
+    "dev-processor-beta": {
+      "subject": "proc-ravi",
+      "scope": "processor",
+      "org_id": "beta"
+    },
+    "dev-borrower-priya": {
+      "subject": "bor-priya",
+      "scope": "borrower",
+      "org_id": "acme",
+      "loan_id": "L-1001"
+    },
+    "dev-borrower-john": {
+      "subject": "bor-john",
+      "scope": "borrower",
+      "org_id": "acme",
+      "loan_id": "L-1002"
+    },
+    "dev-hermes-acme": {
+      "subject": "hermes@acme",
+      "scope": "processor",
+      "org_id": "acme",
+      "via_agent": "hermes"
+    },
+    "dev-openclaw-priya": {
+      "subject": "openclaw:bor-priya",
+      "scope": "borrower",
+      "org_id": "acme",
+      "loan_id": "L-1001",
+      "via_agent": "openclaw"
+    }
   },
   "loans": [
-    {"id": "L-1001", "org_id": "acme", "borrower_name": "Priya Sharma", "borrower_subject": "bor-priya",
-     "loan_officer": "lo-sam", "monthly_debts": "1450.00", "required_docs": ["paystub", "w2", "bank_statement"], "days_idle": 0},
-    {"id": "L-1002", "org_id": "acme", "borrower_name": "John Carter", "borrower_subject": "bor-john",
-     "loan_officer": "lo-sam", "monthly_debts": "900.00", "required_docs": ["paystub", "w2", "bank_statement"], "days_idle": 4},
-    {"id": "L-2001", "org_id": "beta", "borrower_name": "Meera Iyer", "borrower_subject": "bor-meera",
-     "loan_officer": "lo-kim", "monthly_debts": "2100.00", "required_docs": ["paystub", "w2", "bank_statement"], "days_idle": 1}
+    {
+      "id": "L-1001",
+      "org_id": "acme",
+      "borrower_name": "Priya Sharma",
+      "borrower_subject": "bor-priya",
+      "loan_officer": "lo-sam",
+      "monthly_debts": "1450.00",
+      "required_docs": [
+        "paystub",
+        "w2",
+        "bank_statement"
+      ],
+      "days_idle": 0
+    },
+    {
+      "id": "L-1002",
+      "org_id": "acme",
+      "borrower_name": "John Carter",
+      "borrower_subject": "bor-john",
+      "loan_officer": "lo-sam",
+      "monthly_debts": "900.00",
+      "required_docs": [
+        "paystub",
+        "w2",
+        "bank_statement"
+      ],
+      "days_idle": 4
+    },
+    {
+      "id": "L-2001",
+      "org_id": "beta",
+      "borrower_name": "Meera Iyer",
+      "borrower_subject": "bor-meera",
+      "loan_officer": "lo-kim",
+      "monthly_debts": "2100.00",
+      "required_docs": [
+        "paystub",
+        "w2",
+        "bank_statement"
+      ],
+      "days_idle": 1
+    }
   ]
 }

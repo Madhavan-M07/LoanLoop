@@ -60,7 +60,7 @@ class LLM(Protocol):
 
 class OpenAICompatLLM:
     def __init__(
-        self, cfg: ProviderConfig, timeout_s: float = 30.0, http: httpx.AsyncClient | None = None
+        self, cfg: ProviderConfig, *, timeout_s: float, http: httpx.AsyncClient | None = None
     ) -> None:
         self.cfg = cfg
         self.timeout_s = timeout_s
