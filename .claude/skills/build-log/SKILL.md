@@ -5,7 +5,7 @@ description: Append an honest entry to docs/BUILD_LOG.md recording what AI agent
 
 # Add a build-log entry
 
-This log is evidence for job applications ("what did the agents do, what did you fix, what broke"). Be specific and honest. Never inflate.
+This log is the engineering record of how the product is built with agents: what the agents did, what the human fixed, and what broke. Be specific and honest. Never inflate.
 
 Append to `docs/BUILD_LOG.md` (newest at the bottom) using this format:
 

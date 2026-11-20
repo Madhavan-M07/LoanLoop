@@ -19,7 +19,9 @@ if path.endswith(".py") and not r.startswith(".claude/"):
     ruff = uv + ["run", "ruff"] if uv else (["ruff"] if which("ruff") else None)
     if ruff:
         run(ruff + ["format", path])
-        code, out = run(ruff + ["check", "--fix", path])
+        # --unfixable F401: edits land one at a time, so an import added before its first use
+        # looks "unused" in between; auto-removing it silently broke multi-edit changes.
+        code, out = run(ruff + ["check", "--fix", "--unfixable", "F401", path])
         if code not in (0, 127):
             problems.append(f"ruff found issues in {r}:\n{out.strip()[-2000:]}")
 
