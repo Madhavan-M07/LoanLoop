@@ -1,7 +1,7 @@
 from datetime import date
 
-from app.core.pii import mask_for_log, tokenize
-from app.services.synthetic import bank_statement, paystub
+from app.security.pii import mask_for_log, tokenize
+from tests.synthetic import bank_statement, paystub
 
 
 def test_ssn_account_routing_are_tokenized_and_rehydrated():

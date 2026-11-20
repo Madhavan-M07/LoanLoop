@@ -2,6 +2,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
+
 from app.domain.models import (
     BankStatementFields,
     DocStatus,

@@ -11,8 +11,8 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from app.agents import assistant
 from app.core.config import Settings, get_settings
+from app.data.store import Store, load_loans, load_orgs
 from app.domain.models import (
     AuditEvent,
     Document,
@@ -21,13 +21,12 @@ from app.domain.models import (
     MessageDraft,
     Principal,
 )
+from app.integrations.notifier import Notifier, OutboxNotifier, TelegramNotifier
 from app.llm.client import LLM
 from app.llm.factory import build_llm
-from app.services import loans, policy
+from app.services import assistant, loans, policy
 from app.services.access import Forbidden, NotFound, get_loan_for, require_processor
-from app.services.notifier import Notifier, OutboxNotifier, TelegramNotifier
 from app.services.pipeline import PipelineConfig, process_document
-from app.services.store import Store, load_loans, load_orgs
 
 
 @dataclass

@@ -4,12 +4,12 @@ admins, validated, audited, and applied to open files immediately."""
 from datetime import timedelta
 
 import pytest
-from app.api.main import create_app
-from app.llm.fake import OfflineLLM
-from app.services import synthetic
-from app.services.store import Store, load_loans
 from fastapi.testclient import TestClient
 
+from app.api.main import create_app
+from app.data.store import Store, load_loans
+from app.llm.fake import OfflineLLM
+from tests import synthetic
 from tests.conftest import FIXED_NOW
 
 TOKENS = {

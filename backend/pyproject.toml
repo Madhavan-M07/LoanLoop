@@ -17,3 +17,28 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+# ---- Architecture guard: layers may only depend downward (checked by tests/test_architecture.py)
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Layers depend only downward"
+type = "layers"
+layers = [
+  "app.api",                          # interface: HTTP
+  "app.services",                     # use cases + pipeline orchestration
+  "app.agents | app.integrations",    # AI behaviours | outside services (Telegram, OCR...)
+  "app.data",                         # storage
+  "app.llm | app.security",           # model access | PII & injection detection
+  "app.core",                         # configuration
+  "app.rules",                        # business rules (pure)
+  "app.domain",                       # business models (pure)
+]
+
+[[tool.importlinter.contracts]]
+name = "Business core is pure: no web, network or database libraries"
+type = "forbidden"
+source_modules = ["app.domain", "app.rules"]
+forbidden_modules = ["fastapi", "starlette", "httpx", "sqlalchemy", "pydantic_settings"]

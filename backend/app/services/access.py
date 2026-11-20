@@ -6,8 +6,8 @@ probe which loan IDs exist.
 
 from __future__ import annotations
 
+from app.data.store import Store
 from app.domain.models import Loan, Principal, Scope
-from app.services.store import Store
 
 
 class NotFound(Exception):

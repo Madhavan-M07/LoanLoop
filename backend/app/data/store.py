@@ -11,7 +11,6 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from app.core.pii import mask_for_log
 from app.domain.models import (
     AuditEvent,
     DocType,
@@ -21,6 +20,7 @@ from app.domain.models import (
     Organization,
     RuleResult,
 )
+from app.security.pii import mask_for_log
 
 Clock = Callable[[], datetime]
 

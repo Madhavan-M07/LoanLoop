@@ -1,10 +1,11 @@
 import json
 
+from pydantic import BaseModel
+
 from app.agents.tool_loop import ToolError, ToolSpec, run_tool_agent
 from app.domain.models import Principal, Scope
 from app.llm.client import LLMError
 from app.llm.fake import ScriptedLLM, text, tool_call
-from pydantic import BaseModel
 
 PROC = Principal(subject="proc", scope=Scope.PROCESSOR, org_id="acme")
 BORR = Principal(subject="bor", scope=Scope.BORROWER, org_id="acme", loan_id="L-1001")

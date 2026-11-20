@@ -8,7 +8,7 @@ paths:
 # Python conventions
 
 - Python 3.12, fully type-hinted, `ruff` for format and lint. Pydantic v2 models at every boundary (API, LLM output, MCP tool I/O).
-- Layout: `api/` (thin routes) → `services/` (use-cases) → `db/` (SQLAlchemy 2 repositories). Routes never touch the ORM directly.
+- Layers (see CLAUDE.md §4, enforced by import-linter): `api/` → `services/` → `agents/`/`integrations/` → `data/` → `llm/`/`security/` → `core/` → `rules/` → `domain/`. Never import upward. Routes never touch storage directly.
 - Money is `Decimal`, never float. Percentages (DTI, LTV) are `Decimal` with explicit rounding (`ROUND_HALF_UP`, 2 or 3 places as documented).
 - Dates are timezone-aware UTC (`datetime.now(UTC)`).
 - Errors: raise domain exceptions (`app/core/errors.py`), map them to HTTP in one exception handler. Never return a bare 500 with a stack trace.

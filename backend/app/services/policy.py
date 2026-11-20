@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from app.data.store import Store
 from app.domain.models import LenderPolicy, Principal
 from app.llm.client import LLM
 from app.services.access import loans_for, require_admin, require_processor
 from app.services.pipeline import reevaluate
-from app.services.store import Store
 
 
 def get_policy(store: Store, p: Principal) -> LenderPolicy:

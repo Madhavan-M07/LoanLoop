@@ -43,16 +43,30 @@ Python 3.12 + FastAPI + SQLAlchemy 2 + Alembic + Pydantic v2 (managed with `uv`)
 
 LLM provider sits behind one interface (`backend/app/llm/`), so we can switch between free tiers (Gemini / Groq / OpenRouter / Ollama).
 
-## 4. Repo layout (target; create as phases land)
+## 4. Architecture layers (modular monolith, enforced)
+
+Layers may only depend **downward**. `backend/tests/test_architecture.py` (import-linter,
+contracts in `backend/pyproject.toml`) fails the build if this is broken.
 
 ```
-backend/   app/{api,agents,llm,rules,workflows,db,core}/  tests/
-mcp/       LoanLoop MCP server (tools + auth scopes) + tests
-frontend/  Next.js processor dashboard
-evals/     synthetic documents, ground truth, eval runner
-infra/     docker-compose.yml, Coolify config, runbook
-docs/      PRODUCT.md, ROADMAP.md, BUILD_LOG.md, ARCHITECTURE.md, decisions/ (ADRs)
+backend/app/
+  api/            interface: HTTP routes (thin)               ← top
+  services/       use cases + pipeline orchestration (Temporal later)
+  agents/         AI behaviours (classifier, extractor, conditions, tool loop)
+  integrations/   outside services (Telegram; later OCR, file storage)
+  data/           storage (repository: in-memory now, Postgres next)
+  llm/            model providers, fallback, fakes
+  security/       PII tokenization, prompt-injection detection
+  core/           configuration
+  rules/          business rules: PURE (no I/O, no AI)
+  domain/         business models: PURE                       ← bottom
+backend/tests/    tests + synthetic document generator (never shipped)
+backend/demo/     demo data file (dev/test only)
+mcp/              LoanLoop MCP server (separate interface service)
+frontend/  evals/  infra/  docs/   (as phases land)
 ```
+
+Add a folder only when real code needs it (e.g. `workflows/` with Temporal). No pass-through layers.
 
 ## 5. Commands
 

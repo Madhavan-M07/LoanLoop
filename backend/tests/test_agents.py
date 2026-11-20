@@ -1,11 +1,11 @@
 import json
 
 from app.agents.document_agents import classify, draft_borrower_message, extract
-from app.agents.injection import detect_injection
 from app.domain.models import DocType
 from app.llm.client import LLMError
 from app.llm.fake import ScriptedLLM, text
-from app.services.synthetic import INJECTION_FOOTER
+from app.security.injection import detect_injection
+from tests.synthetic import INJECTION_FOOTER
 
 STUB = {
     "employee_name": "P",

@@ -8,11 +8,11 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from app.agents.tool_loop import AgentRun, ToolError, ToolSpec, run_tool_agent
+from app.data.store import Store
 from app.domain.models import Principal, Scope
 from app.llm.client import LLM
 from app.services import loans
 from app.services.access import Forbidden, NotFound
-from app.services.store import Store
 
 SYSTEM = (
     "You are LoanLoop's assistant for mortgage loan processors. Answer using tools only; never "

@@ -4,11 +4,12 @@
 from datetime import date
 
 import pytest
+from fastapi.testclient import TestClient
+
 from app.api.main import create_app
 from app.domain.models import DocStatus
 from app.llm.fake import OfflineLLM
-from app.services import synthetic
-from fastapi.testclient import TestClient
+from tests import synthetic
 
 H = {
     k: {"Authorization": f"Bearer {t}"}

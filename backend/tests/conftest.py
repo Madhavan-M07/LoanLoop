@@ -4,8 +4,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+
 from app.core.config import Settings
-from app.services.store import Store, load_loans, load_orgs
+from app.data.store import Store, load_loans, load_orgs
 
 FIXED_NOW = datetime(2026, 11, 20, 15, 0, tzinfo=UTC)
 DEMO_DATA = Path(__file__).resolve().parents[1] / "demo" / "demo_data.json"

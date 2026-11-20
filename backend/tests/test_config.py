@@ -3,8 +3,9 @@
 import json
 
 import pytest
-from app.core.config import Settings
 from pydantic import ValidationError
+
+from app.core.config import Settings
 
 PROVIDERS = json.dumps([{"name": "g", "base_url": "https://x/v1", "model": "m"}])
 PRINCIPALS = json.dumps({"tok": {"subject": "s", "scope": "processor", "org_id": "o"}})

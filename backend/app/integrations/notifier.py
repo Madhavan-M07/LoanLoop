@@ -6,8 +6,8 @@ from typing import Protocol
 
 import httpx
 
+from app.data.store import Store
 from app.domain.models import Loan
-from app.services.store import Store
 
 
 class Notifier(Protocol):

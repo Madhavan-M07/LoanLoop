@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from pydantic import BaseModel
 
+from app.data.store import Store
 from app.domain.models import (
     DocStatus,
     DraftStatus,
@@ -17,6 +18,7 @@ from app.domain.models import (
     RuleResult,
     Severity,
 )
+from app.integrations.notifier import Notifier
 from app.rules.engine import borrower_actions
 from app.services.access import (
     Forbidden,
@@ -26,8 +28,6 @@ from app.services.access import (
     require_human_processor,
     require_processor,
 )
-from app.services.notifier import Notifier
-from app.services.store import Store
 
 
 class LoanSummary(BaseModel):

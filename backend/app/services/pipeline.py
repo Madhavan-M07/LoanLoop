@@ -17,8 +17,7 @@ from app.agents.document_agents import (
     draft_borrower_message,
     extract,
 )
-from app.agents.injection import detect_injection
-from app.core.pii import tokenize
+from app.data.store import Store
 from app.domain.models import (
     SCHEMA_FOR,
     DocStatus,
@@ -32,7 +31,8 @@ from app.domain.models import (
 )
 from app.llm.client import LLM
 from app.rules.engine import borrower_actions, evaluate_loan
-from app.services.store import Store
+from app.security.injection import detect_injection
+from app.security.pii import tokenize
 
 
 @dataclass(frozen=True)
