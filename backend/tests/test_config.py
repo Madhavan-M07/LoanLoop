@@ -13,7 +13,7 @@ PRINCIPALS = json.dumps({"tok": {"subject": "s", "scope": "processor", "org_id":
 
 def make(**kw) -> Settings:
     base = {"principals_json": "", "llm_providers_json": "[]", "demo_data_path": ""}
-    return Settings(**{**base, **kw})
+    return Settings(_env_file=None, **{**base, **kw})  # hermetic: ignore real .env
 
 
 def test_default_environment_is_prod_and_refuses_to_start_unconfigured(monkeypatch):

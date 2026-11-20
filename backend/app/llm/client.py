@@ -7,11 +7,11 @@ covers every free tier. Agents depend on the `LLM` protocol only, never on a ven
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 import httpx
+from pydantic import SecretStr
 
 from app.core.config import ProviderConfig
 
@@ -60,9 +60,16 @@ class LLM(Protocol):
 
 class OpenAICompatLLM:
     def __init__(
-        self, cfg: ProviderConfig, *, timeout_s: float, http: httpx.AsyncClient | None = None
+        self,
+        cfg: ProviderConfig,
+        *,
+        api_key: SecretStr | None,
+        timeout_s: float,
+        http: httpx.AsyncClient | None = None,
     ) -> None:
+        """The key is passed in (resolved by Settings); this client never reads the environment."""
         self.cfg = cfg
+        self._api_key = api_key
         self.timeout_s = timeout_s
         self._http = http
 
@@ -79,11 +86,8 @@ class OpenAICompatLLM:
         if json_mode:
             body["response_format"] = {"type": "json_object"}
         headers = {}
-        if self.cfg.api_key_env:
-            key = os.environ.get(self.cfg.api_key_env, "")
-            if not key:
-                raise LLMError(f"{self.cfg.name}: env var {self.cfg.api_key_env} not set")
-            headers["Authorization"] = f"Bearer {key}"
+        if self._api_key is not None:
+            headers["Authorization"] = f"Bearer {self._api_key.get_secret_value()}"
         url = self.cfg.base_url.rstrip("/") + "/chat/completions"
         try:
             if self._http:

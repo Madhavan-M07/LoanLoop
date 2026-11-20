@@ -15,6 +15,7 @@ DEMO_DATA = Path(__file__).resolve().parents[1] / "demo" / "demo_data.json"
 @pytest.fixture
 def settings() -> Settings:
     return Settings(
+        _env_file=None,  # hermetic: never read the developer's real .env
         env="test",
         llm_mode="offline",
         principals_json="",

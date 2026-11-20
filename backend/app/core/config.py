@@ -8,11 +8,13 @@ path in dev/test. No people, organizations, tokens or loans live in code.
 from __future__ import annotations
 
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import BaseModel, Field, model_validator
+from dotenv import load_dotenv
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.domain.models import Principal
@@ -68,9 +70,21 @@ class Settings(BaseSettings):
                 problems.append("LOANLOOP_PRINCIPALS_JSON must be set in prod")
         if self.llm_mode == "providers" and not self.providers:
             problems.append("LOANLOOP_LLM_PROVIDERS_JSON is empty but LLM_MODE=providers")
+        if self.llm_mode == "providers":
+            for p in self.providers:  # fail at startup, not on the first customer upload
+                if p.api_key_env and self.provider_api_key(p) is None:
+                    problems.append(f"provider '{p.name}': {p.api_key_env} is not set")
         if problems:
             raise ValueError("unsafe configuration: " + "; ".join(problems))
         return self
+
+    def provider_api_key(self, provider: ProviderConfig) -> SecretStr | None:
+        """The provider's key from the environment. The only place keys are read; callers get a
+        SecretStr, which prints as '**********' in logs, errors and reprs."""
+        if not provider.api_key_env:
+            return None  # e.g. local Ollama needs no key
+        value = os.environ.get(provider.api_key_env, "").strip()
+        return SecretStr(value) if value else None
 
     def demo_data(self) -> dict | None:
         if not self.demo_data_path:
@@ -87,6 +101,14 @@ class Settings(BaseSettings):
         return {tok: Principal(**p) for tok, p in raw.items()}
 
 
+def load_env_file(path: str | Path = ".env") -> None:
+    """Local development: copy a .env file into the process environment so every variable
+    (including provider keys like GEMINI_API_KEY) is visible. Real environment variables win
+    (override=False); in production they are injected by the platform and there is no .env."""
+    load_dotenv(path, override=False)
+
+
 @lru_cache
 def get_settings() -> Settings:
+    load_env_file()
     return Settings()

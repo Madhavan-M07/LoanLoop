@@ -11,4 +11,11 @@ def build_llm(settings: Settings) -> LLM:
     providers = settings.providers
     if not providers:
         raise RuntimeError("LOANLOOP_LLM_MODE=providers but LOANLOOP_LLM_PROVIDERS_JSON is empty")
-    return FallbackLLM([OpenAICompatLLM(p, timeout_s=settings.llm_timeout_s) for p in providers])
+    return FallbackLLM(
+        [
+            OpenAICompatLLM(
+                p, api_key=settings.provider_api_key(p), timeout_s=settings.llm_timeout_s
+            )
+            for p in providers
+        ]
+    )
