@@ -70,6 +70,9 @@ Add a folder only when real code needs it (e.g. `workflows/` with Temporal). No 
 
 ## 5. Commands
 
+- **One-time per clone (required):** `git config core.hooksPath .githooks` (enables the secret scanner pre-commit hook)
+- Secret audit of all tracked files: `python scripts/secret_scan.py --all`; scanner tests: `uv run pytest scripts/tests`
+
 Fill in real commands as each part is scaffolded. Never invent one that doesn't exist yet.
 
 - Backend: `cd backend && uv sync && uv run pytest -q && uv run ruff check . && uv run ruff format .`
