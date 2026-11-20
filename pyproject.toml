@@ -1,5 +1,5 @@
 [tool.uv.workspace]
-members = ["backend", "mcp"]
+members = ["backend"]
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.8", "mypy>=1.13", "import-linter>=2.1"]
@@ -13,7 +13,7 @@ select = ["E", "F", "I", "B", "UP", "S", "ASYNC"]
 ignore = ["S101", "UP046", "UP047"]  # TypeVar generics are fine
 
 [tool.ruff.lint.isort]
-known-first-party = ["app", "tests", "loanloop_mcp"]
+known-first-party = ["app", "tests"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
