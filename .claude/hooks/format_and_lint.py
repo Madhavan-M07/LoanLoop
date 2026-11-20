@@ -4,7 +4,7 @@ Skips silently when the toolchain for that file isn't installed yet.
 """
 import os
 
-from _common import PROJECT_DIR, block, read_input, rel, run, which
+from _common import PROJECT_DIR, block, read_input, rel, run, uv_cmd, which
 
 data = read_input()
 path = (data.get("tool_input") or {}).get("file_path", "")
@@ -14,8 +14,9 @@ if not path or not os.path.exists(path):
 r = rel(path)
 problems = []
 
-if path.endswith(".py"):
-    ruff = ["uv", "run", "ruff"] if which("uv") else (["ruff"] if which("ruff") else None)
+if path.endswith(".py") and not r.startswith(".claude/"):
+    uv = uv_cmd()
+    ruff = uv + ["run", "ruff"] if uv else (["ruff"] if which("ruff") else None)
     if ruff:
         run(ruff + ["format", path])
         code, out = run(ruff + ["check", "--fix", path])

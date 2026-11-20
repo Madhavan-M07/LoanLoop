@@ -44,6 +44,14 @@ def which(cmd: str) -> str | None:
     return shutil.which(cmd)
 
 
+def uv_cmd() -> list[str] | None:
+    """`uv` on PATH, else `python -m uv` (pip --user installs aren't always on PATH)."""
+    if shutil.which("uv"):
+        return ["uv"]
+    code, _ = run([sys.executable, "-m", "uv", "--version"], timeout=15)
+    return [sys.executable, "-m", "uv"] if code == 0 else None
+
+
 def run(args: list[str], cwd: str | None = None, timeout: int = 240) -> tuple[int, str]:
     try:
         p = subprocess.run(args, cwd=cwd or PROJECT_DIR, capture_output=True, text=True, timeout=timeout)

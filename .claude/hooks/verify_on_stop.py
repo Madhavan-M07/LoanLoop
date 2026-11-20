@@ -4,7 +4,7 @@ Runs only the suites for areas with uncommitted changes. Skips areas not scaffol
 """
 import os
 
-from _common import PROJECT_DIR, block, read_input, run, which
+from _common import PROJECT_DIR, block, read_input, run, uv_cmd
 
 data = read_input()
 if data.get("stop_hook_active"):
@@ -21,9 +21,11 @@ for area in ("backend", "mcp"):
     if not any(p.startswith(f"{area}/") and p.endswith(".py") for p in changed):
         continue
     area_dir = os.path.join(PROJECT_DIR, area)
-    if not (which("uv") and os.path.exists(os.path.join(area_dir, "pyproject.toml"))):
+    uv = uv_cmd()
+    if not (uv and os.path.exists(os.path.join(area_dir, "pyproject.toml"))):
         continue
-    c, o = run(["uv", "run", "pytest", "-q", "-x", "--no-header"], cwd=area_dir, timeout=240)
+    c, o = run(uv + ["run", "pytest", "-q", "-x", "--no-header", "-p", "no:cacheprovider"],
+               cwd=area_dir, timeout=240)
     if c not in (0, 5):  # 5 = no tests collected
         failures.append(f"[{area}] pytest failed:\n{o.strip()[-2500:]}")
 
