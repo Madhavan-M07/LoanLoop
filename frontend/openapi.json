@@ -1,0 +1,1775 @@
+{
+  "components": {
+    "schemas": {
+      "AskIn": {
+        "properties": {
+          "question": {
+            "maxLength": 1000,
+            "minLength": 2,
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "AskIn",
+        "type": "object"
+      },
+      "AskOut": {
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "stopped": {
+            "title": "Stopped",
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer",
+          "steps",
+          "stopped"
+        ],
+        "title": "AskOut",
+        "type": "object"
+      },
+      "AuditEvent": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "loan_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loan Id"
+          },
+          "org_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Org Id"
+          }
+        },
+        "required": [
+          "at",
+          "actor",
+          "action"
+        ],
+        "title": "AuditEvent",
+        "type": "object"
+      },
+      "BankStatementFields": {
+        "properties": {
+          "account_holder": {
+            "title": "Account Holder",
+            "type": "string"
+          },
+          "bank_name": {
+            "title": "Bank Name",
+            "type": "string"
+          },
+          "ending_balance": {
+            "title": "Ending Balance",
+            "type": "string"
+          },
+          "evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "statement_end_date": {
+            "format": "date",
+            "title": "Statement End Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_holder",
+          "bank_name",
+          "statement_end_date",
+          "ending_balance"
+        ],
+        "title": "BankStatementFields",
+        "type": "object"
+      },
+      "Classification": {
+        "properties": {
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "doc_type": {
+            "$ref": "#/components/schemas/DocType"
+          },
+          "reason": {
+            "maxLength": 300,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "doc_type",
+          "confidence",
+          "reason"
+        ],
+        "title": "Classification",
+        "type": "object"
+      },
+      "DocStatus": {
+        "enum": [
+          "received",
+          "extracted",
+          "needs_review",
+          "rejected"
+        ],
+        "title": "DocStatus",
+        "type": "string"
+      },
+      "DocType": {
+        "enum": [
+          "paystub",
+          "w2",
+          "bank_statement",
+          "unknown"
+        ],
+        "title": "DocType",
+        "type": "string"
+      },
+      "Document": {
+        "properties": {
+          "classification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Classification"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "doc_type": {
+            "$ref": "#/components/schemas/DocType",
+            "default": "unknown"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaystubFields"
+              },
+              {
+                "$ref": "#/components/schemas/W2Fields"
+              },
+              {
+                "$ref": "#/components/schemas/BankStatementFields"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "loan_id": {
+            "title": "Loan Id",
+            "type": "string"
+          },
+          "review_reasons": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Review Reasons",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DocStatus"
+          },
+          "uploaded_at": {
+            "format": "date-time",
+            "title": "Uploaded At",
+            "type": "string"
+          },
+          "uploaded_by": {
+            "title": "Uploaded By",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "loan_id",
+          "filename",
+          "status",
+          "uploaded_by",
+          "uploaded_at"
+        ],
+        "title": "Document",
+        "type": "object"
+      },
+      "DraftIn": {
+        "properties": {
+          "body": {
+            "maxLength": 1500,
+            "minLength": 10,
+            "title": "Body",
+            "type": "string"
+          },
+          "loan_id": {
+            "title": "Loan Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loan_id",
+          "body"
+        ],
+        "title": "DraftIn",
+        "type": "object"
+      },
+      "DraftStatus": {
+        "enum": [
+          "pending_approval",
+          "approved",
+          "rejected",
+          "sent",
+          "send_failed"
+        ],
+        "title": "DraftStatus",
+        "type": "string"
+      },
+      "Evidence": {
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "snippet": {
+            "maxLength": 300,
+            "title": "Snippet",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "snippet"
+        ],
+        "title": "Evidence",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "LenderPolicy-Input": {
+        "additionalProperties": false,
+        "description": "An organization's document rules. Required on every organization; there is no default\nin code. Bounds reject values that are clearly a mistake.",
+        "properties": {
+          "bank_statement_max_age_days": {
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Bank Statement Max Age Days",
+            "type": "integer"
+          },
+          "max_dti": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Max Dti"
+          },
+          "paystub_max_age_days": {
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Paystub Max Age Days",
+            "type": "integer"
+          },
+          "w2_max_years_back": {
+            "description": "Oldest acceptable W-2: year - N",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "W2 Max Years Back",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "paystub_max_age_days",
+          "bank_statement_max_age_days",
+          "w2_max_years_back",
+          "max_dti"
+        ],
+        "title": "LenderPolicy",
+        "type": "object"
+      },
+      "LenderPolicy-Output": {
+        "additionalProperties": false,
+        "description": "An organization's document rules. Required on every organization; there is no default\nin code. Bounds reject values that are clearly a mistake.",
+        "properties": {
+          "bank_statement_max_age_days": {
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Bank Statement Max Age Days",
+            "type": "integer"
+          },
+          "max_dti": {
+            "title": "Max Dti",
+            "type": "string"
+          },
+          "paystub_max_age_days": {
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Paystub Max Age Days",
+            "type": "integer"
+          },
+          "w2_max_years_back": {
+            "description": "Oldest acceptable W-2: year - N",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "W2 Max Years Back",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "paystub_max_age_days",
+          "bank_statement_max_age_days",
+          "w2_max_years_back",
+          "max_dti"
+        ],
+        "title": "LenderPolicy",
+        "type": "object"
+      },
+      "Loan": {
+        "properties": {
+          "borrower_name": {
+            "title": "Borrower Name",
+            "type": "string"
+          },
+          "borrower_subject": {
+            "title": "Borrower Subject",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_activity_at": {
+            "format": "date-time",
+            "title": "Last Activity At",
+            "type": "string"
+          },
+          "loan_officer": {
+            "title": "Loan Officer",
+            "type": "string"
+          },
+          "monthly_debts": {
+            "title": "Monthly Debts",
+            "type": "string"
+          },
+          "org_id": {
+            "title": "Org Id",
+            "type": "string"
+          },
+          "required_docs": {
+            "items": {
+              "$ref": "#/components/schemas/DocType"
+            },
+            "title": "Required Docs",
+            "type": "array"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/LoanStage",
+            "default": "collecting_documents"
+          },
+          "telegram_chat_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram Chat Id"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "borrower_name",
+          "borrower_subject",
+          "loan_officer",
+          "monthly_debts",
+          "required_docs",
+          "created_at",
+          "last_activity_at"
+        ],
+        "title": "Loan",
+        "type": "object"
+      },
+      "LoanFile": {
+        "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            },
+            "title": "Documents",
+            "type": "array"
+          },
+          "loan": {
+            "$ref": "#/components/schemas/Loan"
+          },
+          "pending_drafts": {
+            "items": {
+              "$ref": "#/components/schemas/MessageDraft"
+            },
+            "title": "Pending Drafts",
+            "type": "array"
+          },
+          "rule_results": {
+            "items": {
+              "$ref": "#/components/schemas/RuleResult"
+            },
+            "title": "Rule Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "loan",
+          "documents",
+          "rule_results",
+          "pending_drafts"
+        ],
+        "title": "LoanFile",
+        "type": "object"
+      },
+      "LoanStage": {
+        "enum": [
+          "collecting_documents",
+          "needs_processor_review",
+          "file_complete"
+        ],
+        "title": "LoanStage",
+        "type": "string"
+      },
+      "LoanStatus": {
+        "description": "Borrower-safe view of a loan: no other people's data, no internal notes.",
+        "properties": {
+          "documents_received": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Documents Received",
+            "type": "array"
+          },
+          "loan_id": {
+            "title": "Loan Id",
+            "type": "string"
+          },
+          "outstanding_items": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Outstanding Items",
+            "type": "array"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/LoanStage"
+          }
+        },
+        "required": [
+          "loan_id",
+          "stage",
+          "documents_received",
+          "outstanding_items"
+        ],
+        "title": "LoanStatus",
+        "type": "object"
+      },
+      "LoanSummary": {
+        "properties": {
+          "borrower_name": {
+            "title": "Borrower Name",
+            "type": "string"
+          },
+          "days_since_activity": {
+            "title": "Days Since Activity",
+            "type": "integer"
+          },
+          "loan_id": {
+            "title": "Loan Id",
+            "type": "string"
+          },
+          "open_issues": {
+            "title": "Open Issues",
+            "type": "integer"
+          },
+          "pending_drafts": {
+            "title": "Pending Drafts",
+            "type": "integer"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/LoanStage"
+          }
+        },
+        "required": [
+          "loan_id",
+          "borrower_name",
+          "stage",
+          "days_since_activity",
+          "open_issues",
+          "pending_drafts"
+        ],
+        "title": "LoanSummary",
+        "type": "object"
+      },
+      "MessageDraft": {
+        "properties": {
+          "body": {
+            "maxLength": 1500,
+            "title": "Body",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "loan_id": {
+            "title": "Loan Id",
+            "type": "string"
+          },
+          "request_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Key"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DraftStatus",
+            "default": "pending_approval"
+          }
+        },
+        "required": [
+          "id",
+          "loan_id",
+          "body",
+          "created_by",
+          "created_at"
+        ],
+        "title": "MessageDraft",
+        "type": "object"
+      },
+      "PaystubFields": {
+        "properties": {
+          "employee_name": {
+            "title": "Employee Name",
+            "type": "string"
+          },
+          "employer_name": {
+            "title": "Employer Name",
+            "type": "string"
+          },
+          "evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "gross_pay": {
+            "title": "Gross Pay",
+            "type": "string"
+          },
+          "net_pay": {
+            "title": "Net Pay",
+            "type": "string"
+          },
+          "pay_date": {
+            "format": "date",
+            "title": "Pay Date",
+            "type": "string"
+          },
+          "pay_frequency": {
+            "enum": [
+              "weekly",
+              "biweekly",
+              "semimonthly",
+              "monthly"
+            ],
+            "title": "Pay Frequency",
+            "type": "string"
+          },
+          "ytd_gross": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ytd Gross"
+          }
+        },
+        "required": [
+          "employee_name",
+          "employer_name",
+          "pay_date",
+          "pay_frequency",
+          "gross_pay",
+          "net_pay"
+        ],
+        "title": "PaystubFields",
+        "type": "object"
+      },
+      "Principal": {
+        "description": "Who is calling. Always derived from authentication, never from tool/LLM arguments.",
+        "properties": {
+          "is_admin": {
+            "default": false,
+            "title": "Is Admin",
+            "type": "boolean"
+          },
+          "loan_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loan Id"
+          },
+          "org_id": {
+            "title": "Org Id",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "via_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via Agent"
+          }
+        },
+        "required": [
+          "subject",
+          "scope",
+          "org_id"
+        ],
+        "title": "Principal",
+        "type": "object"
+      },
+      "RuleResult": {
+        "properties": {
+          "borrower_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Borrower Action"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "data": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Data",
+            "type": "object"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "message"
+        ],
+        "title": "RuleResult",
+        "type": "object"
+      },
+      "Scope": {
+        "enum": [
+          "borrower",
+          "processor"
+        ],
+        "title": "Scope",
+        "type": "string"
+      },
+      "Severity": {
+        "enum": [
+          "pass",
+          "warn",
+          "fail"
+        ],
+        "title": "Severity",
+        "type": "string"
+      },
+      "UploadIn": {
+        "properties": {
+          "filename": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Filename",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 50000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "filename",
+          "text"
+        ],
+        "title": "UploadIn",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "W2Fields": {
+        "properties": {
+          "employee_name": {
+            "title": "Employee Name",
+            "type": "string"
+          },
+          "employer_name": {
+            "title": "Employer Name",
+            "type": "string"
+          },
+          "evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "tax_year": {
+            "title": "Tax Year",
+            "type": "integer"
+          },
+          "wages": {
+            "title": "Wages",
+            "type": "string"
+          }
+        },
+        "required": [
+          "employee_name",
+          "employer_name",
+          "tax_year",
+          "wages"
+        ],
+        "title": "W2Fields",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "LoanLoop API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/assistant/ask": {
+      "post": {
+        "operationId": "ask_assistant_ask_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ask"
+      }
+    },
+    "/audit": {
+      "get": {
+        "operationId": "audit_audit_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "loan_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Loan Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEvent"
+                  },
+                  "title": "Response Audit Audit Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Audit"
+      }
+    },
+    "/drafts": {
+      "get": {
+        "operationId": "drafts_drafts_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MessageDraft"
+                  },
+                  "title": "Response Drafts Drafts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Drafts"
+      },
+      "post": {
+        "operationId": "create_draft_drafts_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageDraft"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Draft"
+      }
+    },
+    "/drafts/{draft_id}/approve": {
+      "post": {
+        "operationId": "approve_drafts__draft_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "draft_id",
+            "required": true,
+            "schema": {
+              "title": "Draft Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageDraft"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve"
+      }
+    },
+    "/drafts/{draft_id}/reject": {
+      "post": {
+        "operationId": "reject_drafts__draft_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "draft_id",
+            "required": true,
+            "schema": {
+              "title": "Draft Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageDraft"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject"
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/loans": {
+      "get": {
+        "operationId": "list_loans_loans_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LoanSummary"
+                  },
+                  "title": "Response List Loans Loans Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Loans"
+      }
+    },
+    "/loans/stuck": {
+      "get": {
+        "operationId": "stuck_loans_stuck_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "min_days",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Days"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LoanSummary"
+                  },
+                  "title": "Response Stuck Loans Stuck Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stuck"
+      }
+    },
+    "/loans/{loan_id}": {
+      "get": {
+        "operationId": "loan_file_loans__loan_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loan_id",
+            "required": true,
+            "schema": {
+              "title": "Loan Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoanFile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Loan File"
+      }
+    },
+    "/loans/{loan_id}/documents": {
+      "post": {
+        "operationId": "upload_loans__loan_id__documents_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loan_id",
+            "required": true,
+            "schema": {
+              "title": "Loan Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload"
+      }
+    },
+    "/loans/{loan_id}/status": {
+      "get": {
+        "operationId": "status_loans__loan_id__status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "loan_id",
+            "required": true,
+            "schema": {
+              "title": "Loan Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoanStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Status"
+      }
+    },
+    "/me": {
+      "get": {
+        "operationId": "me_me_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Principal"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Me"
+      }
+    },
+    "/org/policy": {
+      "get": {
+        "operationId": "read_policy_org_policy_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LenderPolicy-Output"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Policy"
+      },
+      "put": {
+        "operationId": "replace_policy_org_policy_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LenderPolicy-Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LenderPolicy-Output"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replace Policy"
+      }
+    }
+  }
+}

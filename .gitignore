@@ -48,3 +48,6 @@ next-env.d.ts
 Thumbs.db
 .vscode/
 .idea/
+
+# Browser automation output (Playwright MCP snapshots, screenshots, console logs)
+.playwright-mcp/
