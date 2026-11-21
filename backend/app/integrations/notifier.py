@@ -6,7 +6,7 @@ from typing import Protocol
 
 import httpx
 
-from app.data.store import Store
+from app.data.repository import Repository
 from app.domain.models import Loan
 
 
@@ -17,22 +17,22 @@ class Notifier(Protocol):
 class OutboxNotifier:
     """Dev/demo: records the message instead of sending it."""
 
-    def __init__(self, store: Store) -> None:
-        self.store = store
+    def __init__(self, repo: Repository) -> None:
+        self.repo = repo
 
     async def send(self, loan: Loan, body: str) -> bool:
-        self.store.outbox.append({"loan_id": loan.id, "channel": "outbox", "body": body})
+        async with self.repo.session() as s:
+            await s.add_outbox(loan.id, "outbox", body)
         return True
 
 
 class TelegramNotifier:
     """Sends via the Telegram Bot API to the borrower's linked chat (falls back to outbox)."""
 
-    def __init__(self, store: Store, bot_token: str, timeout_s: float) -> None:
-        self.store = store
+    def __init__(self, repo: Repository, bot_token: str, timeout_s: float) -> None:
         self.bot_token = bot_token
         self.timeout_s = timeout_s
-        self.fallback = OutboxNotifier(store)
+        self.fallback = OutboxNotifier(repo)
 
     async def send(self, loan: Loan, body: str) -> bool:
         if not loan.telegram_chat_id:

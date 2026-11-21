@@ -6,7 +6,7 @@ probe which loan IDs exist.
 
 from __future__ import annotations
 
-from app.data.store import Store
+from app.data.repository import Session
 from app.domain.models import Loan, Principal, Scope
 
 
@@ -26,15 +26,16 @@ def can_access(p: Principal, loan: Loan) -> bool:
     return p.scope == Scope.BORROWER and p.loan_id == loan.id
 
 
-def get_loan_for(store: Store, p: Principal, loan_id: str) -> Loan:
-    loan = store.loans.get(loan_id)
+async def get_loan_for(s: Session, p: Principal, loan_id: str) -> Loan:
+    loan = await s.get_loan(loan_id)
     if loan is None or not can_access(p, loan):
         raise NotFound(f"loan {loan_id} not found")
     return loan
 
 
-def loans_for(store: Store, p: Principal) -> list[Loan]:
-    return [ln for ln in store.loans.values() if can_access(p, ln)]
+async def loans_for(s: Session, p: Principal) -> list[Loan]:
+    """Only ever queries the caller's own organization."""
+    return [ln for ln in await s.list_loans(p.org_id) if can_access(p, ln)]
 
 
 def require_processor(p: Principal) -> None:

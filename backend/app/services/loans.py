@@ -6,7 +6,7 @@ from datetime import timedelta
 
 from pydantic import BaseModel
 
-from app.data.store import Store
+from app.data.repository import Repository, Session
 from app.domain.models import (
     OPEN_DRAFT_STATUSES,
     DraftStatus,
@@ -46,122 +46,143 @@ class LoanFile(BaseModel):
     pending_drafts: list[MessageDraft]
 
 
-def loan_status(store: Store, p: Principal, loan_id: str) -> LoanStatus:
-    loan = get_loan_for(store, p, loan_id)
-    docs = store.documents[loan.id]
+async def loan_status(repo: Repository, p: Principal, loan_id: str) -> LoanStatus:
+    async with repo.session() as s:
+        loan = await get_loan_for(s, p, loan_id)
+        docs = await s.documents(loan.id)
+        results = await s.results(loan.id)
     return LoanStatus(
         loan_id=loan.id,
         stage=loan.stage,
         documents_received=[f"{d.doc_type.value} ({d.status.value})" for d in docs],
-        outstanding_items=borrower_actions(store.results[loan.id])
+        outstanding_items=borrower_actions(results)
         or ([] if docs else ["Upload your documents to get started."]),
     )
 
 
-def summarize(store: Store, loan: Loan) -> LoanSummary:
+async def _summarize(s: Session, repo: Repository, loan: Loan) -> LoanSummary:
+    results = await s.results(loan.id)
+    drafts = await s.loan_drafts(loan.id)
     return LoanSummary(
         loan_id=loan.id,
         borrower_name=loan.borrower_name,
         stage=loan.stage,
-        days_since_activity=(store.now() - loan.last_activity_at).days,
-        open_issues=sum(r.severity != Severity.PASS for r in store.results[loan.id]),
-        pending_drafts=sum(
-            d.loan_id == loan.id and d.status in OPEN_DRAFT_STATUSES for d in store.drafts.values()
-        ),
+        days_since_activity=(repo.now() - loan.last_activity_at).days,
+        open_issues=sum(r.severity != Severity.PASS for r in results),
+        pending_drafts=sum(d.status in OPEN_DRAFT_STATUSES for d in drafts),
     )
 
 
-def list_loans(store: Store, p: Principal) -> list[LoanSummary]:
-    return [summarize(store, ln) for ln in loans_for(store, p)]
+async def list_loans(repo: Repository, p: Principal) -> list[LoanSummary]:
+    async with repo.session() as s:
+        return [await _summarize(s, repo, ln) for ln in await loans_for(s, p)]
 
 
-def loan_file(store: Store, p: Principal, loan_id: str) -> LoanFile:
+async def loan_file(repo: Repository, p: Principal, loan_id: str) -> LoanFile:
     require_processor(p)
-    loan = get_loan_for(store, p, loan_id)
+    async with repo.session() as s:
+        loan = await get_loan_for(s, p, loan_id)
+        docs = await s.documents(loan.id)
+        results = await s.results(loan.id)
+        drafts = await s.loan_drafts(loan.id)
     return LoanFile(
         loan=loan,
-        documents=[
-            d.model_dump(mode="json", exclude={"fields": {"evidence"}})
-            for d in store.documents[loan.id]
-        ],
-        rule_results=store.results[loan.id],
-        pending_drafts=[
-            d
-            for d in store.drafts.values()
-            if d.loan_id == loan.id and d.status in OPEN_DRAFT_STATUSES
-        ],
+        documents=[d.model_dump(mode="json", exclude={"fields": {"evidence"}}) for d in docs],
+        rule_results=results,
+        pending_drafts=[d for d in drafts if d.status in OPEN_DRAFT_STATUSES],
     )
 
 
-def stuck_files(store: Store, p: Principal, min_days: int) -> list[LoanSummary]:
+async def stuck_files(repo: Repository, p: Principal, min_days: int) -> list[LoanSummary]:
     require_processor(p)
-    cutoff = store.now() - timedelta(days=min_days)
-    return [
-        summarize(store, ln)
-        for ln in loans_for(store, p)
-        if ln.stage != LoanStage.COMPLETE and ln.last_activity_at <= cutoff
-    ]
+    cutoff = repo.now() - timedelta(days=min_days)
+    async with repo.session() as s:
+        return [
+            await _summarize(s, repo, ln)
+            for ln in await loans_for(s, p)
+            if ln.stage != LoanStage.COMPLETE and ln.last_activity_at <= cutoff
+        ]
 
 
-def pending_drafts(store: Store, p: Principal) -> list[MessageDraft]:
+async def pending_drafts(repo: Repository, p: Principal) -> list[MessageDraft]:
     require_processor(p)
-    ids = {ln.id for ln in loans_for(store, p)}
-    return [
-        d for d in store.drafts.values() if d.loan_id in ids and d.status in OPEN_DRAFT_STATUSES
-    ]
+    async with repo.session() as s:
+        ids = {ln.id for ln in await loans_for(s, p)}
+        return [
+            d
+            for d in await s.org_drafts(p.org_id)
+            if d.loan_id in ids and d.status in OPEN_DRAFT_STATUSES
+        ]
 
 
-def create_draft(store: Store, p: Principal, loan_id: str, body: str) -> MessageDraft:
+async def create_draft(repo: Repository, p: Principal, loan_id: str, body: str) -> MessageDraft:
     """Agents may DRAFT; only a human processor can approve/send."""
     require_processor(p)
-    loan = get_loan_for(store, p, loan_id)
-    draft = MessageDraft(
-        id=store.new_id("M"),
-        loan_id=loan.id,
-        body=body,
-        created_by=p.subject,
-        created_at=store.now(),
-    )
-    store.drafts[draft.id] = draft
-    store.audit(p.subject, "draft_created", loan.id, f"{draft.id} awaiting approval")
+    async with repo.session() as s:
+        loan = await get_loan_for(s, p, loan_id)
+        draft = MessageDraft(
+            id=repo.new_id("M"),
+            loan_id=loan.id,
+            body=body,
+            created_by=p.subject,
+            created_at=repo.now(),
+        )
+        await s.save_draft(draft)
+        await s.audit(p.subject, "draft_created", loan.id, f"{draft.id} awaiting approval")
     return draft
 
 
-def _draft_for(store: Store, p: Principal, draft_id: str) -> MessageDraft:
-    d = store.drafts.get(draft_id)
+async def _open_draft_locked(s: Session, p: Principal, draft_id: str) -> MessageDraft:
+    """Find the draft, check the caller may see its loan, LOCK that loan, then re-read the
+    draft: two simultaneous approvals can't both pass the "still open?" check."""
+    d = await s.get_draft(draft_id)
     if d is None:
         raise NotFound(f"draft {draft_id} not found")
-    get_loan_for(store, p, d.loan_id)  # tenant check
-    if d.status not in OPEN_DRAFT_STATUSES:
-        raise Forbidden(f"draft is {d.status.value}; it can no longer be approved or rejected")
+    await get_loan_for(s, p, d.loan_id)  # tenant check
+    await s.lock_loan(d.loan_id)
+    d = await s.get_draft(draft_id)
+    if d is None or d.status not in OPEN_DRAFT_STATUSES:
+        status = d.status.value if d else "gone"
+        raise Forbidden(f"draft is {status}; it can no longer be approved or rejected")
     return d
 
 
 async def approve_draft(
-    store: Store, p: Principal, draft_id: str, notifier: Notifier
+    repo: Repository, p: Principal, draft_id: str, notifier: Notifier
 ) -> MessageDraft:
     require_human_processor(p)
-    d = _draft_for(store, p, draft_id)
-    d.status, d.decided_by, d.decided_at = DraftStatus.APPROVED, p.subject, store.now()
-    store.audit(p.subject, "draft_approved", d.loan_id, d.id)
-    loan = store.loans[d.loan_id]
+    async with repo.session() as s:
+        d = await _open_draft_locked(s, p, draft_id)
+        d.status, d.decided_by, d.decided_at = DraftStatus.APPROVED, p.subject, repo.now()
+        await s.save_draft(d)
+        await s.audit(p.subject, "draft_approved", d.loan_id, d.id)
+        loan = await s.get_loan(d.loan_id)
+    assert loan is not None  # loans are never deleted
+
+    # Sent OUTSIDE the transaction: a slow channel must not hold the database.
     reason = "refused by channel"
     try:
         delivered = await notifier.send(loan, d.body)
     except Exception as e:  # any delivery failure must land back in the inbox, never strand it
         delivered, reason = False, type(e).__name__
-    if delivered:
-        d.status = DraftStatus.SENT
-        store.audit("notifier", "message_sent", d.loan_id, d.id)
-    else:
-        d.status = DraftStatus.SEND_FAILED
-        store.audit("notifier", "message_send_failed", d.loan_id, f"{d.id}: {reason}")
+
+    async with repo.session() as s:
+        if delivered:
+            d.status = DraftStatus.SENT
+            await s.save_draft(d)
+            await s.audit("notifier", "message_sent", d.loan_id, d.id)
+        else:
+            d.status = DraftStatus.SEND_FAILED
+            await s.save_draft(d)
+            await s.audit("notifier", "message_send_failed", d.loan_id, f"{d.id}: {reason}")
     return d
 
 
-def reject_draft(store: Store, p: Principal, draft_id: str) -> MessageDraft:
+async def reject_draft(repo: Repository, p: Principal, draft_id: str) -> MessageDraft:
     require_human_processor(p)
-    d = _draft_for(store, p, draft_id)
-    d.status, d.decided_by, d.decided_at = DraftStatus.REJECTED, p.subject, store.now()
-    store.audit(p.subject, "draft_rejected", d.loan_id, d.id)
+    async with repo.session() as s:
+        d = await _open_draft_locked(s, p, draft_id)
+        d.status, d.decided_by, d.decided_at = DraftStatus.REJECTED, p.subject, repo.now()
+        await s.save_draft(d)
+        await s.audit(p.subject, "draft_rejected", d.loan_id, d.id)
     return d

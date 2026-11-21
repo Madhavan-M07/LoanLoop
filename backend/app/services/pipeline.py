@@ -17,7 +17,7 @@ from app.agents.document_agents import (
     draft_borrower_message,
     extract,
 )
-from app.data.store import Store
+from app.data.repository import Repository, Session
 from app.domain.models import (
     OPEN_DRAFT_STATUSES,
     SCHEMA_FOR,
@@ -45,7 +45,7 @@ class PipelineConfig:
 
 
 async def process_document(
-    store: Store,
+    repo: Repository,
     llm: LLM,
     loan: Loan,
     *,
@@ -54,37 +54,40 @@ async def process_document(
     uploaded_by: str,
     cfg: PipelineConfig,
 ) -> Document:
+    """No session is held during the classifier/extractor LLM calls: the document is saved as
+    RECEIVED first, the agents run, then one locked session saves the result and re-checks
+    the file. `loan` is only used for its id; its current state is re-read under the lock."""
     doc = Document(
-        id=store.new_id("D"),
+        id=repo.new_id("D"),
         loan_id=loan.id,
         filename=filename[:120],
         status=DocStatus.RECEIVED,
         uploaded_by=uploaded_by,
-        uploaded_at=store.now(),
+        uploaded_at=repo.now(),
     )
-    store.documents[loan.id].append(doc)
-    store.audit(uploaded_by, "document_uploaded", loan.id, f"{doc.id} {doc.filename}")
+    async with repo.session() as s:
+        await s.save_document(doc)
+        await s.audit(uploaded_by, "document_uploaded", loan.id, f"{doc.id} {doc.filename}")
 
     # 1. Security gate (deterministic)
     if not text.strip() or len(text) > cfg.max_document_chars:
         doc.status = DocStatus.REJECTED
         doc.review_reasons.append("empty or too large")
-        store.audit("system", "document_rejected", loan.id, doc.id)
-        await reevaluate(store, llm, loan, touch_activity=True)
-        return doc
+        await repo.audit("system", "document_rejected", loan.id, doc.id)
+        return await _finish(repo, llm, loan.id, doc)
     hits = detect_injection(text)
     if hits:
         doc.review_reasons.append(f"possible prompt injection: {', '.join(hits)[:200]}")
-        store.audit("system", "injection_suspected", loan.id, f"{doc.id}: {hits}")
+        await repo.audit("system", "injection_suspected", loan.id, f"{doc.id}: {hits}")
 
     # 2. PII tokenization: real identifiers never leave our server
     masked, vault = tokenize(text)
     if vault.values:
-        store.audit("system", "pii_masked", loan.id, f"{doc.id}: {vault.kinds}")
+        await repo.audit("system", "pii_masked", loan.id, f"{doc.id}: {vault.kinds}")
 
     # 3. Classifier agent
     cls = await classify(llm, masked)
-    store.audit(
+    await repo.audit(
         "classifier_agent",
         "classified",
         loan.id,
@@ -93,18 +96,18 @@ async def process_document(
     )
     if not cls.ok or cls.value is None:
         return await _needs_review(
-            store, llm, loan, doc, f"classification failed: {cls.errors[-1:]}"
+            repo, llm, loan.id, doc, f"classification failed: {cls.errors[-1:]}"
         )
     doc.classification = cls.value
     doc.doc_type = cls.value.doc_type
     if cls.value.doc_type == DocType.UNKNOWN or cls.value.confidence < cfg.min_classify_confidence:
         return await _needs_review(
-            store, llm, loan, doc, f"low-confidence classification ({cls.value.confidence})"
+            repo, llm, loan.id, doc, f"low-confidence classification ({cls.value.confidence})"
         )
 
     # 4. Extractor agent
     ext = await extract(llm, cls.value.doc_type, masked)
-    store.audit(
+    await repo.audit(
         "extractor_agent",
         "extracted" if ext.ok else "extraction_failed",
         loan.id,
@@ -112,24 +115,35 @@ async def process_document(
         f"prompt={ext.prompt_version} model={ext.model or 'none'}",
     )
     if not ext.ok or ext.value is None:
-        return await _needs_review(store, llm, loan, doc, f"extraction failed: {ext.errors[-1:]}")
+        return await _needs_review(repo, llm, loan.id, doc, f"extraction failed: {ext.errors[-1:]}")
 
     # 5. Rehydrate tokens locally, re-validate
     schema = SCHEMA_FOR[cls.value.doc_type]
     doc.fields = schema.model_validate(vault.rehydrate(ext.value.model_dump(mode="json")))  # type: ignore[assignment]
     doc.status = DocStatus.NEEDS_REVIEW if hits else DocStatus.EXTRACTED
-    await reevaluate(store, llm, loan, touch_activity=True)
-    return doc
+    return await _finish(repo, llm, loan.id, doc)
 
 
-async def _needs_review(store: Store, llm: LLM, loan: Loan, doc: Document, reason: str) -> Document:
+async def _needs_review(
+    repo: Repository, llm: LLM, loan_id: str, doc: Document, reason: str
+) -> Document:
     doc.status = DocStatus.NEEDS_REVIEW
     doc.review_reasons.append(reason)
-    await reevaluate(store, llm, loan, touch_activity=True)
+    return await _finish(repo, llm, loan_id, doc)
+
+
+async def _finish(repo: Repository, llm: LLM, loan_id: str, doc: Document) -> Document:
+    """Save the document's final state and re-check the file, as one locked unit."""
+    async with repo.session() as s:
+        loan = await s.lock_loan(loan_id)
+        if loan is None:
+            raise LookupError(f"loan {loan_id} disappeared during processing")
+        await s.save_document(doc)
+        await _reevaluate_locked(s, repo, llm, loan, touch_activity=True)
     return doc
 
 
-async def reevaluate(store: Store, llm: LLM, loan: Loan, *, touch_activity: bool) -> None:
+async def reevaluate(repo: Repository, llm: LLM, loan_id: str, *, touch_activity: bool) -> None:
     """Re-run the rules over the whole file with the organization's CURRENT policy, update the
     stage, and draft a borrower message if something is outstanding.
 
@@ -139,15 +153,19 @@ async def reevaluate(store: Store, llm: LLM, loan: Loan, *, touch_activity: bool
     Runs under the loan's lock: evaluate -> "is this request already pending?" -> draft -> save
     is one unit, so simultaneous uploads can't each create the same draft.
     """
-    async with store.loan_lock(loan.id):
-        await _reevaluate_locked(store, llm, loan, touch_activity=touch_activity)
+    async with repo.session() as s:
+        loan = await s.lock_loan(loan_id)
+        if loan is not None:
+            await _reevaluate_locked(s, repo, llm, loan, touch_activity=touch_activity)
 
 
-async def _reevaluate_locked(store: Store, llm: LLM, loan: Loan, *, touch_activity: bool) -> None:
-    docs = store.documents[loan.id]
-    policy = store.org(loan.org_id).policy
-    results = evaluate_loan(loan, docs, store.now().date(), policy)
-    store.results[loan.id] = results
+async def _reevaluate_locked(
+    s: Session, repo: Repository, llm: LLM, loan: Loan, *, touch_activity: bool
+) -> None:
+    docs = await s.documents(loan.id)
+    policy = (await s.get_org(loan.org_id)).policy
+    results = evaluate_loan(loan, docs, repo.now().date(), policy)
+    await s.replace_results(loan.id, results)
     actions = borrower_actions(results)
 
     if actions:
@@ -159,8 +177,9 @@ async def _reevaluate_locked(store: Store, llm: LLM, loan: Loan, *, touch_activi
     else:
         loan.stage = LoanStage.COMPLETE
     if touch_activity:
-        loan.last_activity_at = store.now()
-    store.audit(
+        loan.last_activity_at = repo.now()
+    await s.save_loan(loan)
+    await s.audit(
         "rules_engine",
         "evaluated",
         loan.id,
@@ -168,18 +187,20 @@ async def _reevaluate_locked(store: Store, llm: LLM, loan: Loan, *, touch_activi
     )
 
     if actions and docs:  # only chase once the borrower has started sending documents
-        await _draft_if_changed(store, llm, loan, actions)
+        await _draft_if_changed(s, repo, llm, loan, actions)
     elif not actions:
-        _retire_stale_drafts(store, loan, keep_key=None)  # nothing outstanding any more
+        await _retire_stale_drafts(s, repo, loan, keep_key=None)  # nothing outstanding any more
 
 
-def _retire_stale_drafts(store: Store, loan: Loan, keep_key: str | None) -> bool:
+async def _retire_stale_drafts(
+    s: Session, repo: Repository, loan: Loan, keep_key: str | None
+) -> bool:
     """Supersede open SYSTEM drafts (pending or send-failed) that no longer match the outstanding
     items, so a processor can never approve or retry a stale request. Returns True if a draft
     with keep_key is still open."""
     kept = False
-    for d in store.drafts.values():
-        if d.loan_id != loan.id or d.status not in OPEN_DRAFT_STATUSES or d.request_key is None:
+    for d in await s.loan_drafts(loan.id):
+        if d.status not in OPEN_DRAFT_STATUSES or d.request_key is None:
             continue  # human/agent-authored drafts (no request_key) are left for the processor
         if keep_key is not None and d.request_key == keep_key:
             kept = True
@@ -187,24 +208,30 @@ def _retire_stale_drafts(store: Store, loan: Loan, keep_key: str | None) -> bool
         d.status, d.decided_by, d.decided_at = (
             DraftStatus.REJECTED,
             "system:superseded",
-            store.now(),
+            repo.now(),
         )
-        store.audit("system", "draft_superseded", loan.id, d.id)
+        await s.save_draft(d)
+        await s.audit("system", "draft_superseded", loan.id, d.id)
     return kept
 
 
-async def _draft_if_changed(store: Store, llm: LLM, loan: Loan, actions: list[str]) -> None:
+async def _draft_if_changed(
+    s: Session, repo: Repository, llm: LLM, loan: Loan, actions: list[str]
+) -> None:
     key = "|".join(actions)
-    if _retire_stale_drafts(store, loan, keep_key=key):
+    if await _retire_stale_drafts(s, repo, loan, keep_key=key):
         return  # same request already waiting for approval
+    # KNOWN TRADE-OFF: this LLM call runs while the loan is locked (and, with Postgres, inside
+    # the transaction), for up to the LLM timeout. Only this loan waits. Removed when drafting
+    # moves into a Temporal activity (roadmap Phase 3).
     body, outcome = await draft_borrower_message(llm, actions)
     draft = MessageDraft(
-        id=store.new_id("M"),
+        id=repo.new_id("M"),
         loan_id=loan.id,
         body=body,
         created_by="conditions_agent" if outcome.ok else "system:template",
-        created_at=store.now(),
+        created_at=repo.now(),
         request_key=key,
     )
-    store.drafts[draft.id] = draft
-    store.audit(draft.created_by, "draft_created", loan.id, f"{draft.id} awaiting approval")
+    await s.save_draft(draft)
+    await s.audit(draft.created_by, "draft_created", loan.id, f"{draft.id} awaiting approval")

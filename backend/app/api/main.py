@@ -137,23 +137,24 @@ def create_app(
 
     @app.get("/loans")
     async def list_loans(p: P) -> list[loans.LoanSummary]:
-        return loans.list_loans(store, p)
+        return await loans.list_loans(store, p)
 
     @app.get("/loans/stuck")
     async def stuck(p: P, min_days: int | None = None) -> list[loans.LoanSummary]:
-        return loans.stuck_files(store, p, min_days or settings.stuck_after_days)
+        return await loans.stuck_files(store, p, min_days or settings.stuck_after_days)
 
     @app.get("/loans/{loan_id}/status")
     async def status(p: P, loan_id: str) -> LoanStatus:
-        return loans.loan_status(store, p, loan_id)
+        return await loans.loan_status(store, p, loan_id)
 
     @app.get("/loans/{loan_id}")
     async def loan_file(p: P, loan_id: str) -> loans.LoanFile:
-        return loans.loan_file(store, p, loan_id)
+        return await loans.loan_file(store, p, loan_id)
 
     @app.post("/loans/{loan_id}/documents", status_code=201)
     async def upload(p: P, loan_id: str, body: UploadIn) -> Document:
-        loan = get_loan_for(store, p, loan_id)
+        async with store.session() as s:
+            loan = await get_loan_for(s, p, loan_id)
         doc = await process_document(
             store,
             state.llm,
@@ -168,11 +169,11 @@ def create_app(
 
     @app.get("/drafts")
     async def drafts(p: P) -> list[MessageDraft]:
-        return loans.pending_drafts(store, p)
+        return await loans.pending_drafts(store, p)
 
     @app.post("/drafts", status_code=201)
     async def create_draft(p: P, body: DraftIn) -> MessageDraft:
-        return loans.create_draft(store, p, body.loan_id, body.body)
+        return await loans.create_draft(store, p, body.loan_id, body.body)
 
     @app.post("/drafts/{draft_id}/approve")
     async def approve(p: P, draft_id: str) -> MessageDraft:
@@ -180,7 +181,7 @@ def create_app(
 
     @app.post("/drafts/{draft_id}/reject")
     async def reject(p: P, draft_id: str) -> MessageDraft:
-        return loans.reject_draft(store, p, draft_id)
+        return await loans.reject_draft(store, p, draft_id)
 
     @app.post("/assistant/ask")
     async def ask(p: P, body: AskIn) -> AskOut:
@@ -198,14 +199,14 @@ def create_app(
     @app.get("/audit")
     async def audit(p: P, loan_id: str | None = None) -> list[AuditEvent]:
         require_processor(p)
-        if loan_id:
-            get_loan_for(store, p, loan_id)
-            return [e for e in store.audit_log if e.loan_id == loan_id]
-        return [e for e in store.audit_log if e.org_id == p.org_id]
+        async with store.session() as s:
+            if loan_id:
+                await get_loan_for(s, p, loan_id)  # tenant check before reading its history
+            return await s.audit_events(p.org_id, loan_id)
 
     @app.get("/org/policy")
     async def read_policy(p: P) -> LenderPolicy:
-        return policy.get_policy(store, p)
+        return await policy.get_policy(store, p)
 
     @app.put("/org/policy")
     async def replace_policy(p: P, body: LenderPolicy) -> LenderPolicy:

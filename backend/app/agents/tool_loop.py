@@ -8,6 +8,7 @@ result so it can recover, and every call is audited.
 
 from __future__ import annotations
 
+import inspect
 import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -19,7 +20,7 @@ from app.domain.models import Principal, Scope
 from app.llm.client import LLM, LLMError
 
 Handler = Callable[[Any, Principal], Awaitable[Any]]
-AuditFn = Callable[[str, Principal, str], None]
+AuditFn = Callable[[str, Principal, str], Awaitable[None] | None]  # sync or async
 
 
 @dataclass(frozen=True)
@@ -110,7 +111,8 @@ async def run_tool_agent(
                 except Exception as e:  # never leak internals to the model
                     status = "internal_error"
                     content = json.dumps({"error": f"internal error ({type(e).__name__})"})
-            audit(f"tool:{call.name}", principal, status)
+            if inspect.isawaitable(pending := audit(f"tool:{call.name}", principal, status)):
+                await pending
             run.steps.append({"tool": call.name, "status": status})
             messages.append({"role": "tool", "tool_call_id": call.id, "content": content})
     run.stopped = "max_steps"
