@@ -2,6 +2,7 @@
 
 Skips silently when the toolchain for that file isn't installed yet.
 """
+
 import os
 
 from _common import PROJECT_DIR, block, read_input, rel, run, uv_cmd, which
@@ -25,7 +26,9 @@ if path.endswith(".py") and not r.startswith(".claude/"):
         if code not in (0, 127):
             problems.append(f"ruff found issues in {r}:\n{out.strip()[-2000:]}")
 
-elif path.endswith((".ts", ".tsx", ".js", ".jsx", ".css", ".json", ".md")) and r.startswith("frontend/"):
+elif path.endswith((".ts", ".tsx", ".js", ".jsx", ".css", ".json", ".md")) and r.startswith(
+    "frontend/"
+):
     bin_dir = os.path.join(PROJECT_DIR, "frontend", "node_modules", ".bin")
     prettier = os.path.join(bin_dir, "prettier.cmd" if os.name == "nt" else "prettier")
     eslint = os.path.join(bin_dir, "eslint.cmd" if os.name == "nt" else "eslint")

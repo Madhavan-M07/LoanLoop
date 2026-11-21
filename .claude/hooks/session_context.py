@@ -1,4 +1,5 @@
 """SessionStart: print live repo state so Claude starts every session repo-aware."""
+
 import os
 import re
 
@@ -10,10 +11,14 @@ c, branch = run(["git", "branch", "--show-current"], timeout=10)
 if c == 0:
     c2, status = run(["git", "status", "--porcelain"], timeout=10)
     n = len([s for s in status.splitlines() if s.strip()])
-    lines.append(f"- Git branch: `{branch.strip() or '(no commits yet)'}`, {n} uncommitted change(s)")
+    lines.append(
+        f"- Git branch: `{branch.strip() or '(no commits yet)'}`, {n} uncommitted change(s)"
+    )
     c3, wt = run(["git", "worktree", "list"], timeout=10)
     if c3 == 0 and len(wt.splitlines()) > 1:
-        lines.append(f"- Active worktrees: {len(wt.splitlines())} (parallel agent work in progress)")
+        lines.append(
+            f"- Active worktrees: {len(wt.splitlines())} (parallel agent work in progress)"
+        )
 
 roadmap = os.path.join(PROJECT_DIR, "docs", "ROADMAP.md")
 if os.path.exists(roadmap):
@@ -30,5 +35,7 @@ if os.path.exists(log):
     if entries:
         lines.append(f"- Last build-log entry: {entries[-1]}")
 
-lines.append("- Reminder: outcome first (O1–O6 in CLAUDE.md); verify with evidence before saying done.")
+lines.append(
+    "- Reminder: outcome first (O1–O6 in CLAUDE.md); verify with evidence before saying done."
+)
 print("\n".join(lines))

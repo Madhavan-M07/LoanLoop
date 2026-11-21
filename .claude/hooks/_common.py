@@ -1,13 +1,21 @@
 """Shared helpers for LoanLoop Claude Code hooks (stdlib only, cross-platform)."""
+
 import json
 import os
 import shutil
 import subprocess
 import sys
 
+
 def _native(path: str) -> str:
     """Convert Git-Bash/MSYS paths like /c/Users/x to C:/Users/x on Windows."""
-    if os.name == "nt" and len(path) > 2 and path[0] == "/" and path[2] == "/" and path[1].isalpha():
+    if (
+        os.name == "nt"
+        and len(path) > 2
+        and path[0] == "/"
+        and path[2] == "/"
+        and path[1].isalpha()
+    ):
         return f"{path[1].upper()}:{path[2:]}"
     return path
 
@@ -24,13 +32,17 @@ def read_input() -> dict:
 
 def decide(decision: str, reason: str) -> None:
     """PreToolUse decision: 'allow' | 'deny' | 'ask'."""
-    print(json.dumps({
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": decision,
-            "permissionDecisionReason": reason,
-        }
-    }))
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": decision,
+                    "permissionDecisionReason": reason,
+                }
+            }
+        )
+    )
     sys.exit(0)
 
 
@@ -54,7 +66,9 @@ def uv_cmd() -> list[str] | None:
 
 def run(args: list[str], cwd: str | None = None, timeout: int = 240) -> tuple[int, str]:
     try:
-        p = subprocess.run(args, cwd=cwd or PROJECT_DIR, capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run(  # noqa: S603 - args are fixed tool commands built by our hooks
+            args, cwd=cwd or PROJECT_DIR, capture_output=True, text=True, timeout=timeout
+        )
         return p.returncode, (p.stdout + p.stderr)
     except subprocess.TimeoutExpired:
         return 124, f"timed out after {timeout}s: {' '.join(args)}"
