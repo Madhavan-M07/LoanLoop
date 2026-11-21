@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from app.data.repository import Repository, Session
 from app.domain.models import (
     OPEN_DRAFT_STATUSES,
+    Document,
     DraftStatus,
     Loan,
     LoanStage,
@@ -41,7 +42,7 @@ class LoanSummary(BaseModel):
 
 class LoanFile(BaseModel):
     loan: Loan
-    documents: list[dict[str, object]]
+    documents: list[Document]
     rule_results: list[RuleResult]
     pending_drafts: list[MessageDraft]
 
@@ -78,8 +79,15 @@ async def list_loans(repo: Repository, p: Principal) -> list[LoanSummary]:
         return [await _summarize(s, repo, ln) for ln in await loans_for(s, p)]
 
 
-async def loan_file(repo: Repository, p: Principal, loan_id: str) -> LoanFile:
+async def loan_file(
+    repo: Repository, p: Principal, loan_id: str, *, include_evidence: bool = False
+) -> LoanFile:
+    """Evidence snippets are RAW document text (real identifiers, never tokenized). They are
+    returned only when include_evidence is set, which the API does for human processors.
+    The assistant reuses this function and sends its result to an outside LLM, so it never
+    sets it; agent identities never get evidence either."""
     require_processor(p)
+    show_evidence = include_evidence and not p.via_agent
     async with repo.session() as s:
         loan = await get_loan_for(s, p, loan_id)
         docs = await s.documents(loan.id)
@@ -87,10 +95,16 @@ async def loan_file(repo: Repository, p: Principal, loan_id: str) -> LoanFile:
         drafts = await s.loan_drafts(loan.id)
     return LoanFile(
         loan=loan,
-        documents=[d.model_dump(mode="json", exclude={"fields": {"evidence"}}) for d in docs],
+        documents=docs if show_evidence else [_without_evidence(d) for d in docs],
         rule_results=results,
         pending_drafts=[d for d in drafts if d.status in OPEN_DRAFT_STATUSES],
     )
+
+
+def _without_evidence(d: Document) -> Document:
+    if d.fields is None:
+        return d
+    return d.model_copy(update={"fields": d.fields.model_copy(update={"evidence": []})})
 
 
 async def stuck_files(repo: Repository, p: Principal, min_days: int) -> list[LoanSummary]:

@@ -159,7 +159,8 @@ def create_app(
 
     @app.get("/loans/{loan_id}")
     async def loan_file(p: P, loan_id: str) -> loans.LoanFile:
-        return await loans.loan_file(store, p, loan_id)
+        # Human processors see the source evidence behind every extracted value.
+        return await loans.loan_file(store, p, loan_id, include_evidence=True)
 
     @app.post("/loans/{loan_id}/documents", status_code=201)
     async def upload(p: P, loan_id: str, body: UploadIn) -> Document:
