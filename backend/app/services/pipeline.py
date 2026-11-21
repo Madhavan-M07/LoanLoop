@@ -19,6 +19,7 @@ from app.agents.document_agents import (
 )
 from app.data.store import Store
 from app.domain.models import (
+    OPEN_DRAFT_STATUSES,
     SCHEMA_FOR,
     DocStatus,
     DocType,
@@ -134,7 +135,15 @@ async def reevaluate(store: Store, llm: LLM, loan: Loan, *, touch_activity: bool
 
     touch_activity: True only for real file activity (an upload). A policy change re-checks
     files but must not make them look recently active (that would hide stuck files).
+
+    Runs under the loan's lock: evaluate -> "is this request already pending?" -> draft -> save
+    is one unit, so simultaneous uploads can't each create the same draft.
     """
+    async with store.loan_lock(loan.id):
+        await _reevaluate_locked(store, llm, loan, touch_activity=touch_activity)
+
+
+async def _reevaluate_locked(store: Store, llm: LLM, loan: Loan, *, touch_activity: bool) -> None:
     docs = store.documents[loan.id]
     policy = store.org(loan.org_id).policy
     results = evaluate_loan(loan, docs, store.now().date(), policy)
@@ -165,11 +174,12 @@ async def reevaluate(store: Store, llm: LLM, loan: Loan, *, touch_activity: bool
 
 
 def _retire_stale_drafts(store: Store, loan: Loan, keep_key: str | None) -> bool:
-    """Supersede pending SYSTEM drafts that no longer match the outstanding items, so a processor
-    can never approve a stale request. Returns True if a draft with keep_key is still pending."""
+    """Supersede open SYSTEM drafts (pending or send-failed) that no longer match the outstanding
+    items, so a processor can never approve or retry a stale request. Returns True if a draft
+    with keep_key is still open."""
     kept = False
     for d in store.drafts.values():
-        if d.loan_id != loan.id or d.status != DraftStatus.PENDING or d.request_key is None:
+        if d.loan_id != loan.id or d.status not in OPEN_DRAFT_STATUSES or d.request_key is None:
             continue  # human/agent-authored drafts (no request_key) are left for the processor
         if keep_key is not None and d.request_key == keep_key:
             kept = True

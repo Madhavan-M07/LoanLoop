@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from app.data.store import Store
 from app.domain.models import (
+    OPEN_DRAFT_STATUSES,
     DraftStatus,
     Loan,
     LoanStage,
@@ -65,7 +66,7 @@ def summarize(store: Store, loan: Loan) -> LoanSummary:
         days_since_activity=(store.now() - loan.last_activity_at).days,
         open_issues=sum(r.severity != Severity.PASS for r in store.results[loan.id]),
         pending_drafts=sum(
-            d.loan_id == loan.id and d.status == DraftStatus.PENDING for d in store.drafts.values()
+            d.loan_id == loan.id and d.status in OPEN_DRAFT_STATUSES for d in store.drafts.values()
         ),
     )
 
@@ -87,7 +88,7 @@ def loan_file(store: Store, p: Principal, loan_id: str) -> LoanFile:
         pending_drafts=[
             d
             for d in store.drafts.values()
-            if d.loan_id == loan.id and d.status == DraftStatus.PENDING
+            if d.loan_id == loan.id and d.status in OPEN_DRAFT_STATUSES
         ],
     )
 
@@ -106,7 +107,7 @@ def pending_drafts(store: Store, p: Principal) -> list[MessageDraft]:
     require_processor(p)
     ids = {ln.id for ln in loans_for(store, p)}
     return [
-        d for d in store.drafts.values() if d.loan_id in ids and d.status == DraftStatus.PENDING
+        d for d in store.drafts.values() if d.loan_id in ids and d.status in OPEN_DRAFT_STATUSES
     ]
 
 
@@ -131,8 +132,8 @@ def _draft_for(store: Store, p: Principal, draft_id: str) -> MessageDraft:
     if d is None:
         raise NotFound(f"draft {draft_id} not found")
     get_loan_for(store, p, d.loan_id)  # tenant check
-    if d.status != DraftStatus.PENDING:
-        raise Forbidden(f"draft is {d.status.value}, not pending")
+    if d.status not in OPEN_DRAFT_STATUSES:
+        raise Forbidden(f"draft is {d.status.value}; it can no longer be approved or rejected")
     return d
 
 
@@ -144,9 +145,17 @@ async def approve_draft(
     d.status, d.decided_by, d.decided_at = DraftStatus.APPROVED, p.subject, store.now()
     store.audit(p.subject, "draft_approved", d.loan_id, d.id)
     loan = store.loans[d.loan_id]
-    if await notifier.send(loan, d.body):
+    reason = "refused by channel"
+    try:
+        delivered = await notifier.send(loan, d.body)
+    except Exception as e:  # any delivery failure must land back in the inbox, never strand it
+        delivered, reason = False, type(e).__name__
+    if delivered:
         d.status = DraftStatus.SENT
         store.audit("notifier", "message_sent", d.loan_id, d.id)
+    else:
+        d.status = DraftStatus.SEND_FAILED
+        store.audit("notifier", "message_send_failed", d.loan_id, f"{d.id}: {reason}")
     return d
 
 

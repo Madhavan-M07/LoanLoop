@@ -5,6 +5,7 @@ Contains no data of its own: loans come from the API (later) or a demo file (dev
 
 from __future__ import annotations
 
+import asyncio
 import itertools
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -40,6 +41,14 @@ class Store:
         self.audit_log: list[AuditEvent] = []
         self.outbox: list[dict[str, str]] = []
         self._ids = itertools.count(1)
+        self._loan_locks: dict[str, asyncio.Lock] = {}
+
+    def loan_lock(self, loan_id: str) -> asyncio.Lock:
+        """Serializes read-check-write work on ONE loan file (e.g. "is a draft pending? if not,
+        create one") so concurrent uploads can't both pass the check. Other loans are unaffected.
+        In-memory today; becomes a row lock (SELECT ... FOR UPDATE) with Postgres and the
+        one-workflow-per-loan guarantee with Temporal, behind this same call."""
+        return self._loan_locks.setdefault(loan_id, asyncio.Lock())
 
     def new_id(self, prefix: str) -> str:
         return f"{prefix}-{next(self._ids):05d}"

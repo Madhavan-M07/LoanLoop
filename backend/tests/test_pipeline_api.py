@@ -172,3 +172,20 @@ def test_audit_records_which_model_and_prompt_produced_each_result(client, store
     assert ai_events and all(
         "model=offline" in e.detail and "prompt=v1" in e.detail for e in ai_events
     )
+
+
+def test_fresh_paystub_after_expired_one_completes_the_file(client, store):
+    full_file(client, stub_date=date(2026, 9, 30))  # expired paystub -> chase
+    assert store.loans["L-1001"].stage == "collecting_documents"
+    upload(
+        client,
+        "priya",
+        "L-1001",
+        "stub-new.txt",
+        synthetic.paystub(
+            employee="Priya Sharma", employer="Acme Robotics Inc.", pay_date=date(2026, 11, 14)
+        ),
+    )
+    assert store.loans["L-1001"].stage == "file_complete"
+    assert client.get("/loans/L-1001/status", headers=H["priya"]).json()["outstanding_items"] == []
+    assert client.get("/drafts", headers=H["proc"]).json() == []  # stale chase retired

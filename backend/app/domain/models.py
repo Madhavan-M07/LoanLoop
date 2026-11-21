@@ -170,6 +170,11 @@ class DraftStatus(StrEnum):
     APPROVED = "approved"
     REJECTED = "rejected"
     SENT = "sent"
+    SEND_FAILED = "send_failed"  # approved, but delivery failed: back in the inbox for a retry
+
+
+# Drafts that still need a processor: shown in the inbox, can be approved (sent) or rejected.
+OPEN_DRAFT_STATUSES = frozenset({DraftStatus.PENDING, DraftStatus.SEND_FAILED})
 
 
 class MessageDraft(BaseModel):
