@@ -230,3 +230,56 @@ def test_policy_rejects_nonsense_values(bad):
 def test_policy_rejects_unknown_fields():
     with pytest.raises(ValueError):
         LenderPolicy(**POLICY.model_dump(), paystub_max_age_dayz=10)
+
+
+# ---- Superseded documents: a newer document of the same type replaces older ones for
+# recency checks. Integrity checks (fraud signals) still run on every document.
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "expired_code"),
+    [
+        (stub(pay_date=date(2026, 9, 30)), stub(pay_date=date(2026, 11, 14)), "paystub_expired"),
+        (bank(end=date(2026, 8, 31)), bank(end=date(2026, 10, 31)), "bank_statement_expired"),
+        (w2(year=2022), w2(year=2025), "w2_too_old"),
+    ],
+)
+@pytest.mark.parametrize("old_first", [True, False])  # upload order must not matter
+def test_newer_document_supersedes_an_expired_one(old, new, expired_code, old_first):
+    pair = [doc(old, 1), doc(new, 2)] if old_first else [doc(new, 2), doc(old, 1)]
+    res = evaluate_loan(loan(), pair, TODAY, POLICY)
+    assert expired_code not in codes(res)
+    assert borrower_actions(res) == [] or all("missing" in r.code for r in res if r.borrower_action)
+    sup = [r for r in res if r.code == "document_superseded"]
+    assert [(r.document_id, r.severity) for r in sup] == [("D1", Severity.PASS)]
+    assert "D2" in sup[0].message
+
+
+def test_only_the_newest_expired_document_is_reported():
+    docs = [doc(stub(pay_date=date(2026, 8, 1)), 1), doc(stub(pay_date=date(2026, 9, 30)), 2)]
+    res = evaluate_loan(loan(), docs, TODAY, POLICY)
+    expired = [r for r in res if r.code == "paystub_expired"]
+    assert [r.document_id for r in expired] == ["D2"]
+    assert len(borrower_actions(res)) == 3  # paystub + missing W-2 + missing bank statement
+
+
+def test_integrity_checks_still_run_on_superseded_documents():
+    docs = [
+        doc(stub(pay_date=date(2026, 9, 30), gross="1000", net="1200"), 1),
+        doc(stub(pay_date=date(2026, 11, 14)), 2),
+    ]
+    res = evaluate_loan(loan(), docs, TODAY, POLICY)
+    bad = [r for r in res if r.code == "paystub_amounts_inconsistent"]
+    assert [r.document_id for r in bad] == ["D1"]
+
+
+def test_single_document_is_never_marked_superseded():
+    res = evaluate_loan(loan(), [doc(stub(), 1), doc(w2(), 2), doc(bank(), 3)], TODAY, POLICY)
+    assert "document_superseded" not in codes(res)
+
+
+def test_ytd_below_current_pay_warns_processor_not_borrower():
+    s = stub().model_copy(update={"ytd_gross": Decimal("1000.00")})  # gross is 3200.00
+    res = evaluate_loan(loan(), [doc(s)], TODAY, POLICY)
+    r = next(r for r in res if r.code == "paystub_ytd_below_current")
+    assert r.severity == Severity.WARN and r.borrower_action is None

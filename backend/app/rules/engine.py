@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Any
 
 from app.domain.models import (
     BankStatementFields,
@@ -45,16 +46,90 @@ def dti(monthly_debts: Decimal, monthly_income: Decimal) -> Decimal | None:
     return (monthly_debts / monthly_income).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
 
 
-def _latest[T](docs: list[Document], kind: type[T], key: str) -> tuple[Document, T] | None:
-    pairs = [(d, d.fields) for d in docs if isinstance(d.fields, kind)]
-    if not pairs:
-        return None
-    return max(pairs, key=lambda p: getattr(p[1], key))  # type: ignore[return-value]
+# Facts about each schema, not policy: the field that orders documents of that type by recency.
+# Adding a document type means adding its schema here; nothing else in the engine changes.
+RECENCY_FIELD: dict[type, str] = {
+    PaystubFields: "pay_date",
+    W2Fields: "tax_year",
+    BankStatementFields: "statement_end_date",
+}
 
 
-def check_paystub(
-    doc: Document, p: PaystubFields, as_of: date, pol: LenderPolicy
-) -> list[RuleResult]:
+def _recency(d: Document) -> Any:
+    return getattr(d.fields, RECENCY_FIELD[type(d.fields)])
+
+
+def current_documents(docs: list[Document]) -> tuple[dict[type, Document], dict[str, Document]]:
+    """Newest document per type, and {superseded doc id: the newer document replacing it}.
+
+    A borrower who sends a fresh paystub after an expired one has fixed the problem: recency is
+    judged on the newest document only. Older ones stay on file (never deleted) and are reported
+    as superseded. Ties keep the earlier document, so the result is deterministic.
+    """
+    newest: dict[type, Document] = {}
+    for d in docs:
+        kind = type(d.fields)
+        if kind in RECENCY_FIELD and (kind not in newest or _recency(d) > _recency(newest[kind])):
+            newest[kind] = d
+    superseded = {
+        d.id: newest[type(d.fields)]
+        for d in docs
+        if type(d.fields) in newest and newest[type(d.fields)] is not d
+    }
+    return newest, superseded
+
+
+def _current[T](newest: dict[type, Document], kind: type[T]) -> tuple[Document, T] | None:
+    d = newest.get(kind)
+    return (d, d.fields) if d is not None and isinstance(d.fields, kind) else None
+
+
+def check_recency(doc: Document, as_of: date, pol: LenderPolicy) -> list[RuleResult]:
+    """Is the newest document of its type recent enough under the organization's policy?"""
+    f = doc.fields
+    if isinstance(f, PaystubFields):
+        age = (as_of - f.pay_date).days
+        if age > pol.paystub_max_age_days:
+            return [
+                RuleResult(
+                    code="paystub_expired",
+                    severity=Severity.FAIL,
+                    document_id=doc.id,
+                    message=f"Paystub is {age} days old (max {pol.paystub_max_age_days}).",
+                    borrower_action="Send your most recent paystub (dated within the last "
+                    f"{pol.paystub_max_age_days} days).",
+                    data={"age_days": str(age)},
+                )
+            ]
+    elif isinstance(f, BankStatementFields):
+        age = (as_of - f.statement_end_date).days
+        if age > pol.bank_statement_max_age_days:
+            return [
+                RuleResult(
+                    code="bank_statement_expired",
+                    severity=Severity.FAIL,
+                    document_id=doc.id,
+                    message=f"Bank statement is {age} days old "
+                    f"(max {pol.bank_statement_max_age_days}).",
+                    borrower_action="Send your most recent bank statement.",
+                )
+            ]
+    elif isinstance(f, W2Fields) and f.tax_year < as_of.year - pol.w2_max_years_back:
+        return [
+            RuleResult(
+                code="w2_too_old",
+                severity=Severity.FAIL,
+                document_id=doc.id,
+                message=f"W-2 is for {f.tax_year} "
+                f"(oldest accepted: {as_of.year - pol.w2_max_years_back}).",
+                borrower_action=f"Send your {as_of.year - 1} W-2.",
+            )
+        ]
+    return []
+
+
+def check_paystub(doc: Document, p: PaystubFields, as_of: date) -> list[RuleResult]:
+    """Integrity checks (possible errors or fraud). Run on EVERY paystub, superseded or not."""
     out: list[RuleResult] = []
     if p.pay_date > as_of:
         out.append(
@@ -63,19 +138,6 @@ def check_paystub(
                 severity=Severity.FAIL,
                 document_id=doc.id,
                 message=f"Pay date {p.pay_date} is in the future.",
-            )
-        )
-    age = (as_of - p.pay_date).days
-    if age > pol.paystub_max_age_days:
-        out.append(
-            RuleResult(
-                code="paystub_expired",
-                severity=Severity.FAIL,
-                document_id=doc.id,
-                message=f"Paystub is {age} days old (max {pol.paystub_max_age_days}).",
-                borrower_action="Send your most recent paystub (dated within the last "
-                f"{pol.paystub_max_age_days} days).",
-                data={"age_days": str(age)},
             )
         )
     if p.gross_pay <= 0 or p.net_pay < 0 or p.net_pay > p.gross_pay:
@@ -125,40 +187,26 @@ def evaluate_loan(
             )
 
     # 2. Per-document checks
-    for d in usable:
+    newest, superseded = current_documents(usable)
+    for d in usable:  # integrity: every document, superseded or not
         if isinstance(d.fields, PaystubFields):
-            results += check_paystub(d, d.fields, as_of, pol)
-        elif isinstance(d.fields, BankStatementFields):
-            age = (as_of - d.fields.statement_end_date).days
-            if age > pol.bank_statement_max_age_days:
-                results.append(
-                    RuleResult(
-                        code="bank_statement_expired",
-                        severity=Severity.FAIL,
-                        document_id=d.id,
-                        message=f"Bank statement is {age} days old "
-                        f"(max {pol.bank_statement_max_age_days}).",
-                        borrower_action="Send your most recent bank statement.",
-                    )
-                )
-        elif (
-            isinstance(d.fields, W2Fields)
-            and d.fields.tax_year < as_of.year - pol.w2_max_years_back
-        ):
-            results.append(
-                RuleResult(
-                    code="w2_too_old",
-                    severity=Severity.FAIL,
-                    document_id=d.id,
-                    message=f"W-2 is for {d.fields.tax_year} "
-                    f"(oldest accepted: {as_of.year - pol.w2_max_years_back}).",
-                    borrower_action=f"Send your {as_of.year - 1} W-2.",
-                )
+            results += check_paystub(d, d.fields, as_of)
+    for d in newest.values():  # recency: only the newest document of each type
+        results += check_recency(d, as_of, pol)
+    for old_id, newer in superseded.items():
+        results.append(
+            RuleResult(
+                code="document_superseded",
+                severity=Severity.PASS,
+                document_id=old_id,
+                message=f"Superseded by newer {newer.doc_type.value} {newer.id}; "
+                "not used for recency checks.",
             )
+        )
 
-    # 3. Cross-document consistency
-    stub = _latest(usable, PaystubFields, "pay_date")
-    w2 = _latest(usable, W2Fields, "tax_year")
+    # 3. Cross-document consistency (newest documents)
+    stub = _current(newest, PaystubFields)
+    w2 = _current(newest, W2Fields)
     if stub and w2 and normalize_name(stub[1].employer_name) != normalize_name(w2[1].employer_name):
         results.append(
             RuleResult(
