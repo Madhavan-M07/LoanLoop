@@ -12,16 +12,15 @@ import asyncio
 import itertools
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta
-from decimal import Decimal
+from datetime import UTC, datetime
 from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
 from app.data.repository import Clock
+from app.data.seed import demo_loans
 from app.domain.models import (
     AuditEvent,
-    DocType,
     Document,
     Loan,
     MessageDraft,
@@ -207,22 +206,7 @@ def load_orgs(store: Store, orgs: list[dict[str, Any]]) -> Store:
 
 
 def load_loans(store: Store, loans: list[dict[str, Any]]) -> Store:
-    """Load loans from data (demo file today, admin API / Postgres next). `days_idle` lets demo
-    data express recency relative to now."""
-    now = store.now()
-    for raw in loans:
-        days_idle = int(raw.get("days_idle", 0))
-        store.add_loan(
-            Loan(
-                **{
-                    k: v
-                    for k, v in raw.items()
-                    if k not in {"days_idle", "monthly_debts", "required_docs"}
-                },
-                monthly_debts=Decimal(str(raw["monthly_debts"])),
-                required_docs=[DocType(d) for d in raw["required_docs"]],
-                created_at=now - timedelta(days=days_idle),
-                last_activity_at=now - timedelta(days=days_idle),
-            )
-        )
+    """Synchronous demo loader for the in-memory store (tests, demo app)."""
+    for loan in demo_loans(loans, store.now()):
+        store.add_loan(loan)
     return store
