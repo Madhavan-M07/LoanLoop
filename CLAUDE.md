@@ -76,6 +76,8 @@ Add a folder only when real code needs it (e.g. `workflows/` with Temporal). No 
 Fill in real commands as each part is scaffolded. Never invent one that doesn't exist yet.
 
 - Backend: `cd backend && uv sync && uv run pytest -q && uv run ruff check . && uv run ruff format .`
+- Type check (from repo root): `uv run mypy backend/app`
+- CI: `.github/workflows/ci.yml` runs on every push to `main`: secret scan (project scanner + gitleaks), ruff lint + format check, mypy, backend tests, scanner tests. A red CI run on `main` is fixed before anything else.
 - Evals: `cd evals && uv run python run_evals.py` (prints field-level accuracy)
 - Frontend: `cd frontend && npm run lint && npm run typecheck && npm test`
 - Full stack: `docker compose -f infra/docker-compose.yml up -d`

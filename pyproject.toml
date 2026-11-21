@@ -15,6 +15,12 @@ ignore = ["S101", "UP046", "UP047"]  # TypeVar generics are fine
 [tool.ruff.lint.isort]
 known-first-party = ["app", "tests"]
 
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]  # understands Field(default) and BaseSettings constructors
+mypy_path = "backend"
+explicit_package_bases = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
