@@ -11,7 +11,8 @@ Outcome-first: each phase names the outcomes it serves (see CLAUDE.md §1). Chec
 
 ## Phase 1: Document intelligence (O1, O6)
 - [ ] Synthetic borrower document generator (paystub, W-2, bank statement) + ground truth
-- [ ] FastAPI skeleton, Postgres schema, Alembic, document upload
+- [x] FastAPI API + PostgreSQL storage: schema (ADR 0002), Alembic, Postgres repository, data survives restarts, CI runs DB tests
+- [ ] Real file upload (PDF/photo) + OCR (today: plain text upload)
 - [ ] Classify agent + extract agent (structured output, evidence, validation)
 - [ ] Eval runner with field-level accuracy, wired into CI
 

@@ -38,3 +38,25 @@ Separately, the Bash guard blocked the agent's own test command (it contained th
 **What broke & how it was fixed:** The first CI run failed. Locally, ruff had only been run from `backend/`; CI runs it from the repo root, which also covers `.claude/hooks/` (6 unformatted files, 3 lint issues). The local pre-push check missed it because `cmd | tail -1` swallowed ruff's exit code inside an `&&` chain. Fix: formatted the hooks, wrapped 2 long strings, justified one `S603` noqa, smoke-tested the guards, and re-ran every CI step under `set -e -o pipefail` before pushing.
 **Evidence:** CI run 44879056206 on `46475ca`: Secret scan ✅, Backend (lint, format, types, tests) ✅. Locally: mypy clean (30 files), backend 106 passed, scanner 23 passed.
 **Lesson:** Run checks exactly the way CI runs them (same directory, failures not hidden by pipes), or CI is the first place they really run.
+
+## 2026-11-21 — PostgreSQL storage (steps 1–4)
+**Outcome:** Infrastructure for O1–O6: loan files now survive restarts, which a real processor needs before anything else. O2 and O6 can't even be measured without durable history.
+**Agents used:** Claude Code (main session).
+**What the agents did:**
+- Step 1: Postgres 16 in Docker (127.0.0.1 only), `/health` reports the database, SQLAlchemy async + asyncpg.
+- Step 2: ADR 0002 (hybrid schema), 7 tables, Alembic migration 0001. The database itself enforces no duplicate open drafts (partial unique index), an append-only audit log (trigger), and valid enum values. Adminer browser viewer at http://localhost:8080.
+- Step 3a: storage interface (`Repository`/`Session`). The in-memory store returns copies, so a missing save fails in tests exactly as it would in Postgres. All 126 existing tests passed with zero test edits.
+- Step 3b: `PostgresRepository` (one session = one transaction, `FOR NO KEY UPDATE` loan lock). Every store-based test now runs on memory AND Postgres, each Postgres test on a database cloned from a seeded template.
+- Step 3c: the app uses Postgres when configured; prod refuses to start without a database; add-only demo loader (`python -m app.data.seed`); audit rows record before → after.
+- Step 4: CI starts a Postgres service; a guard makes pytest refuse to run in CI if database tests would skip.
+
+**What the human did/fixed:** Approved ADR 0002. Chose local Postgres now and hosted (Oracle VPS or Neon) at deploy time. Fixed the expired Docker Hub login. Set the order: finish storage, then the frontend, then the other layers.
+**What broke & how it was fixed:**
+- Migration used status `'pending'`; the domain stores `'pending_approval'`. Every real draft would have been rejected and the duplicate-draft index would never apply. A test comparing DB values to domain enums caught it; another test now ties the index to `OPEN_DRAFT_STATUSES`.
+- Constraint names were doubled (`ck_loans_ck_loans_stage`) by the naming convention. Fixed with `op.f()`.
+- `localhost` cost ~2 s per connection on Windows (IPv6 first). Using `127.0.0.1` cut the DB suite from 146 s to 15 s.
+- **Security:** pydantic config errors echoed input values, so a refused config printed the tail of a real key from a developer's env file. Fixed with `hide_input_in_errors=True` plus a regression test; the human was asked to rotate the key.
+- An inline shell command hung (a stray `cat >` waiting for input) and a shell quoting error; both were redone with file edits. The project's own Bash guard blocked a command containing the text ".env", which was correct behaviour.
+
+**Evidence:** 184 tests pass (memory + Postgres), 0 skipped in CI (run 44909042883 on `7b90632`). Sabotage checks with the lock disabled: the double-approval and lock-ordering tests fail on Postgres as they should. A real uvicorn server kept an uploaded paystub and its draft across a restart.
+**Lesson:** Verify tests by breaking the thing they guard. The double-approval test passed in memory even without the lock, and only Postgres showed it was meaningful.
