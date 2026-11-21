@@ -77,6 +77,9 @@ Fill in real commands as each part is scaffolded. Never invent one that doesn't 
 
 - Backend: `cd backend && uv sync && uv run pytest -q && uv run ruff check . && uv run ruff format .`
 - Type check (from repo root): `uv run mypy backend/app`
+- Local DB + browser viewer: `docker compose -f infra/docker-compose.yml up -d` → Adminer at http://localhost:8080
+- Migrations (from `backend/`, needs `LOANLOOP_DATABASE_URL`): `uv run alembic upgrade head`. Use `127.0.0.1`, not `localhost`, in DB URLs (localhost costs ~2 s per connection on Windows)
+- DB tests: set `LOANLOOP_TEST_DATABASE_URL` (same URL); without it they are skipped
 - CI: `.github/workflows/ci.yml` runs on every push to `main`: secret scan (project scanner + gitleaks), ruff lint + format check, mypy, backend tests, scanner tests. A red CI run on `main` is fixed before anything else.
 - Evals: `cd evals && uv run python run_evals.py` (prints field-level accuracy)
 - Frontend: `cd frontend && npm run lint && npm run typecheck && npm test`

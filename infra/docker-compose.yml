@@ -22,5 +22,19 @@ services:
       timeout: 3s
       retries: 10
 
+  # Browser view of the database for local development: http://localhost:8080
+  # Login: System=PostgreSQL, Server=postgres, Username=loanloop, Password=loanloop_dev,
+  # Database=loanloop. Bound to 127.0.0.1 only. Never deployed (dev compose file only).
+  adminer:
+    image: adminer:4
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   pgdata:

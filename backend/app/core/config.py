@@ -106,6 +106,15 @@ class Settings(BaseSettings):
         return {tok: Principal(**p) for tok, p in raw.items()}
 
 
+class DatabaseSettings(BaseSettings):
+    """Only what database migrations need. Separate from `Settings` because migrations must run
+    in a deploy step that has the database URL but not the LLM or identity configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="LOANLOOP_", env_file=".env", extra="ignore")
+
+    database_url: SecretStr | None = None
+
+
 def load_env_file(path: str | Path = ".env") -> None:
     """Local development: copy a .env file into the process environment so every variable
     (including provider keys like GEMINI_API_KEY) is visible. Real environment variables win
