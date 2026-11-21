@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     # Dev/test only: JSON file with demo principals and loans (see backend/demo/).
     demo_data_path: str = ""
 
+    # Database. SecretStr: the URL contains the password, so it never prints in logs or errors.
+    # Unset = no database (the in-memory store is still the source of truth until it moves over).
+    database_url: SecretStr | None = None
+    database_timeout_s: float = Field(5.0, gt=0)
+
     # Outbound messages
     telegram_bot_token: str = ""
     notifier_timeout_s: float = Field(10.0, gt=0)

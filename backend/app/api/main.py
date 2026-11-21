@@ -4,6 +4,8 @@ NOTE: no `from __future__ import annotations` here. FastAPI must resolve the loc
 `P` dependency at definition time; string annotations made it a query param (bug found by tests).
 """
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Annotated
 
@@ -12,6 +14,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.core.config import Settings, get_settings
+from app.data.db import Database
 from app.data.store import Store, load_loans, load_orgs
 from app.domain.models import (
     AuditEvent,
@@ -36,6 +39,7 @@ class AppState:
     llm: LLM
     notifier: Notifier
     principals: dict[str, Principal]
+    db: Database | None
 
 
 class UploadIn(BaseModel):
@@ -89,9 +93,20 @@ def create_app(
             else OutboxNotifier(store)
         ),
         principals=settings.principals(),
+        db=(
+            Database(settings.database_url.get_secret_value(), settings.database_timeout_s)
+            if settings.database_url
+            else None
+        ),
     )
 
-    app = FastAPI(title="LoanLoop API", version="0.1.0")
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        yield
+        if state.db is not None:
+            await state.db.dispose()  # close pooled connections on shutdown
+
+    app = FastAPI(title="LoanLoop API", version="0.1.0", lifespan=lifespan)
 
     @app.exception_handler(NotFound)
     async def _nf(_: Request, e: NotFound) -> JSONResponse:
@@ -113,7 +128,8 @@ def create_app(
 
     @app.get("/health")
     async def health() -> dict[str, str]:
-        return {"status": "ok", "llm_mode": settings.llm_mode}
+        db = "not_configured" if state.db is None else await state.db.ping()
+        return {"status": "ok", "llm_mode": settings.llm_mode, "database": db}
 
     @app.get("/me")
     async def me(p: P) -> Principal:

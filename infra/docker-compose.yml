@@ -1,0 +1,26 @@
+# Local development stack. Start:  docker compose -f infra/docker-compose.yml up -d
+# Postgres is bound to 127.0.0.1 only: never reachable from other machines.
+# The default password is a throwaway LOCAL-DEV value; set POSTGRES_PASSWORD to override.
+# Production credentials come from the deploy platform (Coolify), never from this file.
+name: loanloop
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: loanloop
+      POSTGRES_DB: loanloop
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-loanloop_dev}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data # data survives container restarts and rebuilds
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loanloop -d loanloop"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
