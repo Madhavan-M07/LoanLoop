@@ -34,7 +34,25 @@ jobs:
   backend:
     name: Backend (lint, format, types, tests)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    # Real Postgres for the database tests (migrations, constraints, the whole store-based suite
+    # on Postgres, persistence). Throwaway CI-only password; nothing secret.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: loanloop
+          POSTGRES_PASSWORD: loanloop_ci
+          POSTGRES_DB: loanloop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U loanloop -d loanloop"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      LOANLOOP_TEST_DATABASE_URL: postgresql+asyncpg://loanloop:loanloop_ci@127.0.0.1:5432/loanloop
     steps:
       - uses: actions/checkout@v4
 

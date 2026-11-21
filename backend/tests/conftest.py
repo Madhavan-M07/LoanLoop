@@ -15,6 +15,12 @@ DEMO_DATA = Path(__file__).resolve().parents[1] / "demo" / "demo_data.json"
 PG_URL = os.environ.get("LOANLOOP_TEST_DATABASE_URL", "")
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    """In CI the database tests must RUN, never silently skip (GitHub Actions sets CI=true)."""
+    if os.environ.get("CI") == "true" and not PG_URL:
+        raise pytest.UsageError("CI must set LOANLOOP_TEST_DATABASE_URL: database tests would skip")
+
+
 @pytest.fixture
 def settings() -> Settings:
     return Settings(
