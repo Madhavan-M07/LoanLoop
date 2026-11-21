@@ -14,7 +14,7 @@ Feature request: $ARGUMENTS
    - LLM vs deterministic split, with the reason
    - Failure modes and how each one is handled
    - Verification plan: which tests and evals prove it works
-   - Can it be split for parallel agents (separate worktrees, non-overlapping areas)?
+   - Can it be split for parallel agents (non-overlapping areas, on `main`)?
 4. **Branch:** `feat/<short-name>`.
 5. **Build in small steps.** Write tests alongside the code, starting with failing tests for rules and bug fixes.
 6. **Verify with evidence.** Run tests, lint, typecheck, and evals if LLM behavior changed. Paste the real output. Use the `verifier` agent for a fresh-eyes run.

@@ -16,7 +16,7 @@ Produce a plan with exactly these sections:
 4. **Failure modes:** a table of failure | detection | handling (retry / human review / escalate). Include LLM timeout, bad output, untrusted/injected input, duplicate events, crash mid-workflow.
 5. **Security & data:** scopes, PII exposure, audit.
 6. **Verification plan:** specific tests and eval cases that prove it works.
-7. **Work breakdown:** ordered steps, marking which can run in parallel worktrees with non-overlapping file ownership.
+7. **Work breakdown:** ordered steps, marking which can be split across agents with non-overlapping file ownership (all on `main`).
 8. **Simplest version first:** what to cut to ship the smallest valuable slice.
 9. **ADR needed?** yes/no, and the title.
 
