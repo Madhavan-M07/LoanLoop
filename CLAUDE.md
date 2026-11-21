@@ -84,7 +84,9 @@ Fill in real commands as each part is scaffolded. Never invent one that doesn't 
 - Run the API (from `backend/`): `uv run uvicorn --factory app.api.main:app_factory --port 8000`. Uses Postgres when `LOANLOOP_DATABASE_URL` is set; prod refuses to start without it
 - CI: `.github/workflows/ci.yml` runs on every push to `main`: secret scan (project scanner + gitleaks), ruff lint + format check, mypy, backend tests, scanner tests. A red CI run on `main` is fixed before anything else.
 - Evals: `cd evals && uv run python run_evals.py` (prints field-level accuracy)
-- Frontend: `cd frontend && npm run lint && npm run typecheck && npm test`
+- Frontend: `cd frontend && npm run lint && npm run typecheck && npm test && npm run build`
+- Run the frontend: `cd frontend && npm run dev` → http://localhost:3000 (needs the API on :8000; set `LOANLOOP_API_URL` in `frontend/.env.local` to change it). Sign in with a demo user
+- API types: after changing any API route/model, `cd backend && uv run python scripts/export_openapi.py` then `cd frontend && npm run gen:api`. Never hand-write API types; CI fails if either is stale
 - Full stack: `docker compose -f infra/docker-compose.yml up -d`
 
 ## 6. How we work (senior-engineer loop)
