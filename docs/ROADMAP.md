@@ -4,6 +4,7 @@ Outcome-first: each phase names the outcomes it serves (see CLAUDE.md §1). Chec
 
 ## Phase 0: Foundations
 - [x] Claude Code project setup (CLAUDE.md, rules, skills, subagents, hooks, MCP, settings)
+- [x] CI on every push to `main`: secret scan (project scanner + gitleaks), ruff lint + format, mypy, tests
 - [ ] Working-backwards product doc `docs/PRODUCT.md` (customer, problem, outcomes, org value)
 - [ ] Talk to 3–5 loan processors/brokers; record findings in `docs/customer-discovery.md`
 - [ ] Architecture doc `docs/ARCHITECTURE.md` + ADR 0001 (stack & LLM/deterministic boundary)
