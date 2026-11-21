@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -196,3 +196,7 @@ class AuditEvent(BaseModel):
     loan_id: str | None = None
     org_id: str | None = None  # organization-level events (e.g. policy changes)
     detail: str = ""
+    # What changed, as data (e.g. {"stage": "collecting_documents"} -> {"stage": ...}).
+    # Never put document text or PII here: IDs, statuses and settings only.
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None

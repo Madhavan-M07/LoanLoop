@@ -37,7 +37,9 @@ from app.domain.models import (
     Classification,
     DocType,
     Document,
+    DraftStatus,
     Loan,
+    LoanStage,
     MessageDraft,
     Organization,
     RuleResult,
@@ -72,9 +74,11 @@ class PostgresRepository:
         detail: str = "",
         *,
         org_id: str | None = None,
+        before: dict[str, Any] | None = None,
+        after: dict[str, Any] | None = None,
     ) -> None:
         async with self.session() as s:
-            await s.audit(actor, action, loan_id, detail, org_id=org_id)
+            await s.audit(actor, action, loan_id, detail, org_id=org_id, before=before, after=after)
 
 
 async def _upsert(conn: AsyncConnection, table: Table, values: dict[str, Any]) -> None:
@@ -167,8 +171,8 @@ class PostgresSession:
 
     async def save_loan(self, loan: Loan) -> None:
         values = loan.model_dump()
-        values["required_docs"] = [d.value for d in loan.required_docs]
-        values["stage"] = loan.stage.value
+        values["required_docs"] = [DocType(d).value for d in loan.required_docs]
+        values["stage"] = LoanStage(loan.stage).value
         await _upsert(self.conn, loans, values)
 
     # documents and rule results
@@ -254,7 +258,7 @@ class PostgresSession:
 
     async def save_draft(self, draft: MessageDraft) -> None:
         values = draft.model_dump()
-        values["status"] = draft.status.value
+        values["status"] = DraftStatus(draft.status).value
         await _upsert(self.conn, message_drafts, values)
 
     # audit and outbox
@@ -266,6 +270,8 @@ class PostgresSession:
         detail: str = "",
         *,
         org_id: str | None = None,
+        before: dict[str, Any] | None = None,
+        after: dict[str, Any] | None = None,
     ) -> None:
         if org_id is None and loan_id is not None:
             rows = await self._rows(select(loans.c.org_id).where(loans.c.id == loan_id))
@@ -278,6 +284,8 @@ class PostgresSession:
                 loan_id=loan_id,
                 org_id=org_id,
                 detail=mask_for_log(detail)[:500],
+                before=before,
+                after=after,
             )
         )
 
@@ -296,6 +304,8 @@ class PostgresSession:
                 loan_id=r["loan_id"],
                 org_id=r["org_id"],
                 detail=r["detail"],
+                before=r["before"],
+                after=r["after"],
             )
             for r in await self._rows(stmt)
         ]

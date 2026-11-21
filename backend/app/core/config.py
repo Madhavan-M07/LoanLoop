@@ -28,7 +28,10 @@ class ProviderConfig(BaseModel):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="LOANLOOP_", env_file=".env", extra="ignore")
+    # hide_input_in_errors: a config error must never echo values (keys, DB passwords) back.
+    model_config = SettingsConfigDict(
+        env_prefix="LOANLOOP_", env_file=".env", extra="ignore", hide_input_in_errors=True
+    )
 
     env: Literal["dev", "test", "prod"] = "prod"
 
@@ -73,6 +76,8 @@ class Settings(BaseSettings):
                 problems.append("LOANLOOP_LLM_MODE must be 'providers' in prod")
             if not self.principals_json:
                 problems.append("LOANLOOP_PRINCIPALS_JSON must be set in prod")
+            if self.database_url is None:
+                problems.append("LOANLOOP_DATABASE_URL must be set in prod (no in-memory data)")
         if self.llm_mode == "providers" and not self.providers:
             problems.append("LOANLOOP_LLM_PROVIDERS_JSON is empty but LLM_MODE=providers")
         if self.llm_mode == "providers":
@@ -110,7 +115,9 @@ class DatabaseSettings(BaseSettings):
     """Only what database migrations need. Separate from `Settings` because migrations must run
     in a deploy step that has the database URL but not the LLM or identity configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="LOANLOOP_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="LOANLOOP_", env_file=".env", extra="ignore", hide_input_in_errors=True
+    )
 
     database_url: SecretStr | None = None
 

@@ -167,6 +167,7 @@ async def _reevaluate_locked(
     results = evaluate_loan(loan, docs, repo.now().date(), policy)
     await s.replace_results(loan.id, results)
     actions = borrower_actions(results)
+    stage_before = loan.stage
 
     if actions:
         loan.stage = LoanStage.COLLECTING
@@ -184,6 +185,8 @@ async def _reevaluate_locked(
         "evaluated",
         loan.id,
         f"stage={loan.stage} fails={sum(r.severity == Severity.FAIL for r in results)}",
+        before={"stage": stage_before.value},
+        after={"stage": loan.stage.value},
     )
 
     if actions and docs:  # only chase once the borrower has started sending documents
@@ -205,13 +208,21 @@ async def _retire_stale_drafts(
         if keep_key is not None and d.request_key == keep_key:
             kept = True
             continue
+        status_before = d.status
         d.status, d.decided_by, d.decided_at = (
             DraftStatus.REJECTED,
             "system:superseded",
             repo.now(),
         )
         await s.save_draft(d)
-        await s.audit("system", "draft_superseded", loan.id, d.id)
+        await s.audit(
+            "system",
+            "draft_superseded",
+            loan.id,
+            d.id,
+            before={"status": status_before.value},
+            after={"status": d.status.value},
+        )
     return kept
 
 

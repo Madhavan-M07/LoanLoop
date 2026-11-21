@@ -31,9 +31,17 @@ async def update_policy(
         changes = _changes(org.policy, new)
         if not changes:
             return org.policy
+        before = org.policy.model_dump(mode="json")
         org.policy = new
         await s.save_org(org)
-        await s.audit(p.subject, "policy_updated", detail="; ".join(changes), org_id=org.id)
+        await s.audit(
+            p.subject,
+            "policy_updated",
+            detail="; ".join(changes),
+            org_id=org.id,
+            before=before,
+            after=new.model_dump(mode="json"),
+        )
         to_recheck = [ln.id for ln in await loans_for(s, p) if await s.documents(ln.id)]
     for loan_id in to_recheck:  # each file re-checked under its own lock
         await reevaluate(repo, llm, loan_id, touch_activity=False)

@@ -43,9 +43,18 @@ def test_providers_mode_requires_providers():
         make(env="dev", llm_mode="providers")
 
 
+DB = "postgresql+asyncpg://u:p@127.0.0.1:5432/db"  # secret-scan: allow (dummy)
+
+
 def test_valid_prod_config_starts():
-    s = make(env="prod", principals_json=PRINCIPALS, llm_providers_json=PROVIDERS)
+    s = make(env="prod", principals_json=PRINCIPALS, llm_providers_json=PROVIDERS, database_url=DB)
     assert list(s.principals()) == ["tok"]
+
+
+def test_prod_refuses_to_start_without_a_database():
+    """In prod, data must persist: an in-memory store would lose loan files on restart."""
+    with pytest.raises(ValidationError, match="LOANLOOP_DATABASE_URL"):
+        make(env="prod", principals_json=PRINCIPALS, llm_providers_json=PROVIDERS)
 
 
 def test_dev_without_any_identities_refuses_to_guess():
@@ -58,3 +67,16 @@ def test_thresholds_are_configurable_and_validated():
     assert (s.classify_min_confidence, s.stuck_after_days) == (0.8, 5)
     with pytest.raises(ValidationError):
         make(env="dev", llm_mode="offline", classify_min_confidence=1.5)
+
+
+def test_config_errors_never_echo_secret_values():
+    """Regression: a refused config printed the tail of a real key from the developer's env
+    file in its error message (pydantic includes input values by default)."""
+    fake_db = "postgresql+asyncpg://u:SuperSecretPw987@127.0.0.1:5432/db"  # noqa: S105  # secret-scan: allow
+    fake_token = "tg-SECRET-TOKEN-123"  # noqa: S105  (fake)
+    with pytest.raises(ValidationError) as e:
+        make(env="prod", database_url=fake_db, telegram_bot_token=fake_token)
+    message = str(e.value)
+    assert "SuperSecretPw987" not in message
+    assert "tg-SECRET-TOKEN-123" not in message
+    assert "LOANLOOP_PRINCIPALS_JSON" in message  # still says WHAT is wrong

@@ -15,7 +15,9 @@ from pydantic import BaseModel, Field
 
 from app.core.config import Settings, get_settings
 from app.data.db import Database
-from app.data.store import Store, load_loans, load_orgs
+from app.data.postgres import PostgresRepository
+from app.data.repository import Repository
+from app.data.store import Store, load_loans, load_orgs, utc_now
 from app.domain.models import (
     AuditEvent,
     Document,
@@ -35,7 +37,7 @@ from app.services.pipeline import PipelineConfig, process_document
 @dataclass
 class AppState:
     settings: Settings
-    store: Store
+    store: Repository
     llm: LLM
     notifier: Notifier
     principals: dict[str, Principal]
@@ -67,17 +69,29 @@ class AskOut(BaseModel):
 def create_app(
     *,
     settings: Settings | None = None,
-    store: Store | None = None,
+    store: Repository | None = None,
     llm: LLM | None = None,
     notifier: Notifier | None = None,
 ) -> FastAPI:
+    """Storage: an explicit `store` (tests) wins; else PostgreSQL when LOANLOOP_DATABASE_URL is
+    set (data survives restarts; load demo data once with `python -m app.data.seed`); else an
+    in-memory store with the demo file (dev only: prod refuses to start without a database)."""
     settings = settings or get_settings()
+    db = (
+        Database(settings.database_url.get_secret_value(), settings.database_timeout_s)
+        if settings.database_url
+        else None
+    )
     if store is None:
-        store = Store()
-        demo = settings.demo_data()  # None unless LOANLOOP_DEMO_DATA_PATH is set (dev/test only)
-        if demo:
-            load_orgs(store, demo.get("organizations", []))
-            load_loans(store, demo.get("loans", []))
+        if db is not None:
+            store = PostgresRepository(db.engine, utc_now)
+        else:
+            memory = Store()
+            demo = settings.demo_data()  # None unless LOANLOOP_DEMO_DATA_PATH is set (dev/test)
+            if demo:
+                load_orgs(memory, demo.get("organizations", []))
+                load_loans(memory, demo.get("loans", []))
+            store = memory
     pipeline_cfg = PipelineConfig(
         min_classify_confidence=settings.classify_min_confidence,
         max_document_chars=settings.max_document_chars,
@@ -93,11 +107,7 @@ def create_app(
             else OutboxNotifier(store)
         ),
         principals=settings.principals(),
-        db=(
-            Database(settings.database_url.get_secret_value(), settings.database_timeout_s)
-            if settings.database_url
-            else None
-        ),
+        db=db,
     )
 
     @asynccontextmanager

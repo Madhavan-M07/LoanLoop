@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 from datetime import datetime
-from typing import Protocol
+from typing import Any, Protocol
 
 from app.domain.models import (
     AuditEvent,
@@ -67,6 +67,8 @@ class Session(Protocol):
         detail: str = "",
         *,
         org_id: str | None = None,
+        before: dict[str, Any] | None = None,
+        after: dict[str, Any] | None = None,
     ) -> None: ...
     async def audit_events(self, org_id: str, loan_id: str | None = None) -> list[AuditEvent]: ...
     async def add_outbox(self, loan_id: str, channel: str, body: str) -> None: ...
@@ -86,6 +88,8 @@ class Repository(Protocol):
         detail: str = "",
         *,
         org_id: str | None = None,
+        before: dict[str, Any] | None = None,
+        after: dict[str, Any] | None = None,
     ) -> None:
         """One audit row in its own short session (for steps that run outside a session)."""
         ...

@@ -75,9 +75,11 @@ class Store:
         detail: str = "",
         *,
         org_id: str | None = None,
+        before: dict[str, Any] | None = None,
+        after: dict[str, Any] | None = None,
     ) -> None:
         async with self.session() as s:
-            await s.audit(actor, action, loan_id, detail, org_id=org_id)
+            await s.audit(actor, action, loan_id, detail, org_id=org_id, before=before, after=after)
 
     # ---- loading (demo file / tests) ----------------------------------------------------
 
@@ -175,6 +177,8 @@ class MemorySession:
         detail: str = "",
         *,
         org_id: str | None = None,
+        before: dict[str, Any] | None = None,
+        after: dict[str, Any] | None = None,
     ) -> None:
         if org_id is None and loan_id in self.store.loans:
             org_id = self.store.loans[loan_id].org_id
@@ -186,6 +190,8 @@ class MemorySession:
                 loan_id=loan_id,
                 org_id=org_id,
                 detail=mask_for_log(detail)[:500],
+                before=before,
+                after=after,
             )
         )
 

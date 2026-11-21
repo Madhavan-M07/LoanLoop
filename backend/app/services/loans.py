@@ -153,9 +153,17 @@ async def approve_draft(
     require_human_processor(p)
     async with repo.session() as s:
         d = await _open_draft_locked(s, p, draft_id)
+        status_before = d.status
         d.status, d.decided_by, d.decided_at = DraftStatus.APPROVED, p.subject, repo.now()
         await s.save_draft(d)
-        await s.audit(p.subject, "draft_approved", d.loan_id, d.id)
+        await s.audit(
+            p.subject,
+            "draft_approved",
+            d.loan_id,
+            d.id,
+            before={"status": status_before.value},
+            after={"status": d.status.value},
+        )
         loan = await s.get_loan(d.loan_id)
     assert loan is not None  # loans are never deleted
 
@@ -167,14 +175,16 @@ async def approve_draft(
         delivered, reason = False, type(e).__name__
 
     async with repo.session() as s:
-        if delivered:
-            d.status = DraftStatus.SENT
-            await s.save_draft(d)
-            await s.audit("notifier", "message_sent", d.loan_id, d.id)
-        else:
-            d.status = DraftStatus.SEND_FAILED
-            await s.save_draft(d)
-            await s.audit("notifier", "message_send_failed", d.loan_id, f"{d.id}: {reason}")
+        d.status = DraftStatus.SENT if delivered else DraftStatus.SEND_FAILED
+        await s.save_draft(d)
+        await s.audit(
+            "notifier",
+            "message_sent" if delivered else "message_send_failed",
+            d.loan_id,
+            d.id if delivered else f"{d.id}: {reason}",
+            before={"status": DraftStatus.APPROVED.value},
+            after={"status": d.status.value},
+        )
     return d
 
 
@@ -182,7 +192,15 @@ async def reject_draft(repo: Repository, p: Principal, draft_id: str) -> Message
     require_human_processor(p)
     async with repo.session() as s:
         d = await _open_draft_locked(s, p, draft_id)
+        status_before = d.status
         d.status, d.decided_by, d.decided_at = DraftStatus.REJECTED, p.subject, repo.now()
         await s.save_draft(d)
-        await s.audit(p.subject, "draft_rejected", d.loan_id, d.id)
+        await s.audit(
+            p.subject,
+            "draft_rejected",
+            d.loan_id,
+            d.id,
+            before={"status": status_before.value},
+            after={"status": d.status.value},
+        )
     return d
