@@ -23,7 +23,7 @@ Outcome-first: each phase names the outcomes it serves (see CLAUDE.md §1). Chec
 ## Phase 3: Workflow & human approval (O2, O4)
 - [ ] Temporal LoanFileWorkflow: intake → extract → check → conditions → approval signal → send
 - [ ] Reminder/escalation timers; crash-and-resume test
-- [ ] Next.js processor dashboard: file queue, evidence view, approve/reject
+- [x] Next.js processor dashboard: file queue, evidence view, approve/reject (+ borrower upload simulator)
 
 ## Phase 4: Agents over MCP (O4, O5)
 - [ ] LoanLoop MCP server with borrower/processor scopes + scope-denial tests

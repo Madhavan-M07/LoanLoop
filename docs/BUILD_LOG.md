@@ -60,3 +60,25 @@ Separately, the Bash guard blocked the agent's own test command (it contained th
 
 **Evidence:** 184 tests pass (memory + Postgres), 0 skipped in CI (run 44909042883 on `7b90632`). Sabotage checks with the lock disabled: the double-approval and lock-ordering tests fail on Postgres as they should. A real uvicorn server kept an uploaded paystub and its draft across a restart.
 **Lesson:** Verify tests by breaking the thing they guard. The double-approval test passed in memory even without the lock, and only Postgres showed it was meaningful.
+
+## 2026-11-21 — Processor dashboard (frontend)
+**Outcome:** O1/O5 (one place to see and act on files), O4 (approve borrower requests fast), O6 (the evidence behind every AI value is visible).
+**Agents used:** Claude Code (main session), with Playwright MCP for the browser check.
+**What the agents did:**
+- Next.js 15 + Tailwind, server components. Screens: loan queue (+ stuck filter), loan file (required docs, rule checks, extracted fields with source snippets or "verify manually", AI confidence, approval, audit timeline with before → after), approval inbox, borrower upload simulator with synthetic documents.
+- Dev sign-in with demo users; the token lives in an httpOnly cookie and the API is called only from the server.
+- API client and types generated from the backend's OpenAPI schema; CI fails if either is stale.
+- Backend: evidence returned to human processors only (agents and the assistant never get raw document text). Loan file documents are now typed.
+- CI: a frontend job (lint, typecheck, Vitest, build).
+
+**What the human did/fixed:** Asked for the frontend before more backend layers so the product can be seen and debugged. Chose the first screens.
+**What broke & how it was fixed:**
+- The first draft hand-wrote API types and used browser storage, which violates the project's frontend rules. It was replaced with generated types and server-side calls before anything was built on it.
+- Evidence was missing from the loan file API on purpose: the assistant reuses it and must not send raw document text to an outside LLM. Fixed with a human-only flag instead of exposing it to everyone.
+- Ports 3000/8000 were held by other local programs; the check ran on 3011/8011. A shared `.next` build folder caused `__webpack_require__.n is not a function`; `NEXT_DIST_DIR` now gives each instance its own folder.
+- Lint failed (it was linting build output) while the script printed ALL_PASS, because `npm.cmd` didn't propagate the exit code through a pipe. Exit codes are now checked explicitly.
+- The scaffold's `.gitignore` ignored `.env.example`; fixed.
+- The final "Approve & send" click was blocked by the agent's permission policy (it sends a borrower message). Correct: left for the human.
+
+**Evidence:** CI run 44930951949 on `6280603`: frontend, backend (190 tests incl. Postgres), secret scan all green. Browser: borrower upload → paystub extracted; agent approval refused ("a human must"); processor sees only own brokerage; loan file shows evidence and 95% confidence.
+**Lesson:** Read the path-scoped rules before writing the first file. Two of three frontend rules were only noticed after the first draft.
